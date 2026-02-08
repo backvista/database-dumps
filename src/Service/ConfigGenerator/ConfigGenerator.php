@@ -119,13 +119,17 @@ class ConfigGenerator
         $partialExport = [];
 
         $tables = $this->inspector->listTables($connectionName);
+        $total = count($tables);
+        $current = 0;
 
         foreach ($tables as $tableInfo) {
+            $current++;
             $schema = $tableInfo['table_schema'];
             $table = $tableInfo['table_name'];
+            $prefix = "[{$current}/{$total}] {$schema}.{$table}";
 
             if ($this->filter->shouldIgnore($table)) {
-                $this->logger->debug("Пропуск служебной таблицы: {$schema}.{$table}");
+                $this->logger->info("{$prefix} ... SKIP (служебная)");
                 $stats['skipped']++;
                 continue;
             }
@@ -133,13 +137,13 @@ class ConfigGenerator
             $count = $this->inspector->countRows($schema, $table, $connectionName);
 
             if ($count === 0) {
-                $this->logger->debug("Пропуск пустой таблицы: {$schema}.{$table}");
+                $this->logger->info("{$prefix} ... SKIP (пустая)");
                 $stats['empty']++;
                 continue;
             }
 
             if ($count <= $threshold) {
-                $this->logger->info("full_export: {$schema}.{$table} ({$count} строк)");
+                $this->logger->info("{$prefix} ... full_export ({$count} строк)");
                 if (!isset($fullExport[$schema])) {
                     $fullExport[$schema] = [];
                 }
@@ -147,7 +151,7 @@ class ConfigGenerator
                 $stats['full']++;
             } else {
                 $orderBy = $this->inspector->detectOrderColumn($schema, $table, $connectionName);
-                $this->logger->info("partial_export: {$schema}.{$table} ({$count} строк, limit: {$threshold})");
+                $this->logger->info("{$prefix} ... partial_export ({$count} строк, limit: {$threshold})");
                 if (!isset($partialExport[$schema])) {
                     $partialExport[$schema] = [];
                 }

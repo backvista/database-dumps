@@ -39,9 +39,37 @@ class DatabaseDumper
      */
     public function exportTable(TableConfig $config): void
     {
-        try {
-            $this->logger->info("Экспорт: {$config->getFullTableName()}");
+        $this->doExportTable($config, null, null);
+    }
 
+    /**
+     * Экспортировать все таблицы
+     *
+     * @param array<TableConfig> $tables
+     */
+    public function exportAll(array $tables): void
+    {
+        $total = count($tables);
+        $current = 0;
+
+        foreach ($tables as $config) {
+            $current++;
+            $this->doExportTable($config, $current, $total);
+        }
+    }
+
+    /**
+     * @param int|null $current Номер текущей таблицы (null = одиночный экспорт)
+     * @param int|null $total Общее количество таблиц
+     */
+    private function doExportTable(TableConfig $config, ?int $current, ?int $total): void
+    {
+        $prefix = ($current !== null && $total !== null)
+            ? "[{$current}/{$total}] "
+            : '';
+        $tableName = $config->getFullTableName();
+
+        try {
             // 1. Загрузка данных
             $rows = $this->dataFetcher->fetch($config);
 
@@ -54,27 +82,11 @@ class DatabaseDumper
             $this->fileSystem->write($filename, $sql);
 
             $size = $this->fileSystem->getFileSize($filename);
-            $this->logger->info("  ✓ Сохранено: {$filename} (" . $this->formatBytes($size) . ")");
+            $this->logger->info("{$prefix}{$tableName} ... OK ({$this->formatBytes($size)})");
         } catch (\Exception $e) {
-            throw ExportFailedException::fromException($config->getFullTableName(), $e);
+            $this->logger->error("{$prefix}{$tableName} ... ERROR: " . $e->getMessage());
+            throw ExportFailedException::fromException($tableName, $e);
         }
-    }
-
-    /**
-     * Экспортировать все таблицы
-     *
-     * @param array<TableConfig> $tables
-     */
-    public function exportAll(array $tables): void
-    {
-        $total = count($tables);
-        $this->logger->info("Экспорт {$total} таблиц...");
-
-        foreach ($tables as $config) {
-            $this->exportTable($config);
-        }
-
-        $this->logger->info("Экспортировано таблиц: {$total}");
     }
 
     /**
