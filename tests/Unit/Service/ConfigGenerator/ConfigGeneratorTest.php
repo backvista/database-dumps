@@ -2,6 +2,9 @@
 
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\ConfigGenerator;
 
+use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigGenerator;
@@ -24,6 +27,9 @@ class ConfigGeneratorTest extends TestCase
     /** @var LoggerInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $logger;
 
+    /** @var ConnectionRegistryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $registry;
+
     /** @var ConfigGenerator */
     private $generator;
 
@@ -34,11 +40,16 @@ class ConfigGeneratorTest extends TestCase
         $this->fileSystem = $this->createMock(FileSystemInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
+        $this->registry = $this->createMock(ConnectionRegistryInterface::class);
+        $this->registry->method('getDefaultName')->willReturn('default');
+        $this->registry->method('getNames')->willReturn(['default']);
+
         $this->generator = new ConfigGenerator(
             $this->inspector,
             $this->filter,
             $this->fileSystem,
-            $this->logger
+            $this->logger,
+            $this->registry
         );
     }
 
@@ -68,8 +79,8 @@ class ConfigGeneratorTest extends TestCase
         $this->assertEquals(0, $stats['empty']);
 
         $parsed = Yaml::parse($writtenContent);
-        $this->assertArrayHasKey('full_export', $parsed);
-        $this->assertContains('roles', $parsed['full_export']['public']);
+        $this->assertArrayHasKey(DumpConfig::KEY_FULL_EXPORT, $parsed);
+        $this->assertContains('roles', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
     }
 
     public function testGeneratePartialExportTables(): void
@@ -97,9 +108,11 @@ class ConfigGeneratorTest extends TestCase
         $this->assertEquals(1, $stats['partial']);
 
         $parsed = Yaml::parse($writtenContent);
-        $this->assertArrayHasKey('partial_export', $parsed);
-        $this->assertEquals(500, $parsed['partial_export']['public']['orders']['limit']);
-        $this->assertEquals('created_at DESC', $parsed['partial_export']['public']['orders']['order_by']);
+        $this->assertArrayHasKey(DumpConfig::KEY_PARTIAL_EXPORT, $parsed);
+        $this->assertEquals(500, $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders'][TableConfig::KEY_LIMIT]);
+        $this->assertEquals('created_at DESC', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders'][TableConfig::KEY_ORDER_BY]);
+
+        $this->assertStringContainsString(ConfigGenerator::WHERE_HINT, $writtenContent);
     }
 
     public function testGenerateSkipsServiceTables(): void
@@ -147,8 +160,8 @@ class ConfigGeneratorTest extends TestCase
 
         $this->filter->method('shouldIgnore')->willReturn(false);
         $this->inspector->method('countRows')->willReturnMap([
-            ['public', 'exact_threshold', 500],
-            ['public', 'over_threshold', 501],
+            ['public', 'exact_threshold', null, 500],
+            ['public', 'over_threshold', null, 501],
         ]);
         $this->inspector->method('detectOrderColumn')->willReturn('id DESC');
 
@@ -177,9 +190,9 @@ class ConfigGeneratorTest extends TestCase
         ]);
 
         $this->inspector->method('countRows')->willReturnMap([
-            ['public', 'users', 100],
-            ['public', 'orders', 5000],
-            ['public', 'empty_table', 0],
+            ['public', 'users', null, 100],
+            ['public', 'orders', null, 5000],
+            ['public', 'empty_table', null, 0],
         ]);
 
         $this->inspector->method('detectOrderColumn')->willReturn('updated_at DESC');
@@ -201,8 +214,8 @@ class ConfigGeneratorTest extends TestCase
         $this->assertEquals(1, $stats['empty']);
 
         $parsed = Yaml::parse($writtenContent);
-        $this->assertContains('users', $parsed['full_export']['public']);
-        $this->assertArrayHasKey('orders', $parsed['partial_export']['public']);
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertArrayHasKey('orders', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']);
     }
 
     public function testGenerateMultipleSchemas(): void
@@ -229,8 +242,8 @@ class ConfigGeneratorTest extends TestCase
         $this->assertEquals(2, $stats['full']);
 
         $parsed = Yaml::parse($writtenContent);
-        $this->assertContains('users', $parsed['full_export']['public']);
-        $this->assertContains('invoices', $parsed['full_export']['billing']);
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertContains('invoices', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
     }
 
     public function testGenerateWritesToCorrectPath(): void

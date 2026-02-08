@@ -2,7 +2,9 @@
 
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\ConfigGenerator;
 
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\TableInspector;
 use PHPUnit\Framework\TestCase;
 
@@ -11,14 +13,20 @@ class TableInspectorTest extends TestCase
     /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $connection;
 
+    /** @var ConnectionRegistryInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $registry;
+
     protected function setUp(): void
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
+
+        $this->registry = $this->createMock(ConnectionRegistryInterface::class);
+        $this->registry->method('getConnection')->willReturn($this->connection);
     }
 
     public function testListTablesPostgresql(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection
             ->expects($this->once())
             ->method('fetchAllAssociative')
@@ -32,7 +40,7 @@ class TableInspectorTest extends TestCase
                 ['table_schema' => 'public', 'table_name' => 'orders'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $tables = $inspector->listTables();
 
         $this->assertCount(2, $tables);
@@ -42,7 +50,7 @@ class TableInspectorTest extends TestCase
 
     public function testListTablesMysql(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('mysql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::MYSQL);
         $this->connection
             ->expects($this->once())
             ->method('fetchAllAssociative')
@@ -56,7 +64,7 @@ class TableInspectorTest extends TestCase
                 ['table_schema' => 'mydb', 'table_name' => 'products'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $tables = $inspector->listTables();
 
         $this->assertCount(1, $tables);
@@ -65,14 +73,14 @@ class TableInspectorTest extends TestCase
 
     public function testCountRows(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection
             ->expects($this->once())
             ->method('fetchAllAssociative')
             ->with($this->stringContains('COUNT(*)'))
             ->willReturn([['cnt' => 42]]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $count = $inspector->countRows('public', 'users');
 
         $this->assertEquals(42, $count);
@@ -80,14 +88,14 @@ class TableInspectorTest extends TestCase
 
     public function testCountRowsMysql(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('mysql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::MYSQL);
         $this->connection
             ->expects($this->once())
             ->method('fetchAllAssociative')
             ->with($this->stringContains('`public`.`users`'))
             ->willReturn([['cnt' => 100]]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $count = $inspector->countRows('public', 'users');
 
         $this->assertEquals(100, $count);
@@ -95,7 +103,7 @@ class TableInspectorTest extends TestCase
 
     public function testDetectOrderColumnUpdatedAt(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection->method('quote')->willReturnCallback(function ($value) {
             return "'{$value}'";
         });
@@ -109,7 +117,7 @@ class TableInspectorTest extends TestCase
                 ['column_name' => 'updated_at'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $orderColumn = $inspector->detectOrderColumn('public', 'users');
 
         $this->assertEquals('updated_at DESC', $orderColumn);
@@ -117,7 +125,7 @@ class TableInspectorTest extends TestCase
 
     public function testDetectOrderColumnCreatedAt(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection->method('quote')->willReturnCallback(function ($value) {
             return "'{$value}'";
         });
@@ -130,7 +138,7 @@ class TableInspectorTest extends TestCase
                 ['column_name' => 'created_at'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $orderColumn = $inspector->detectOrderColumn('public', 'users');
 
         $this->assertEquals('created_at DESC', $orderColumn);
@@ -138,7 +146,7 @@ class TableInspectorTest extends TestCase
 
     public function testDetectOrderColumnId(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection->method('quote')->willReturnCallback(function ($value) {
             return "'{$value}'";
         });
@@ -151,7 +159,7 @@ class TableInspectorTest extends TestCase
                 ['column_name' => 'email'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $orderColumn = $inspector->detectOrderColumn('public', 'users');
 
         $this->assertEquals('id DESC', $orderColumn);
@@ -159,7 +167,7 @@ class TableInspectorTest extends TestCase
 
     public function testDetectOrderColumnFallbackToFirstColumn(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection->method('quote')->willReturnCallback(function ($value) {
             return "'{$value}'";
         });
@@ -171,7 +179,7 @@ class TableInspectorTest extends TestCase
                 ['column_name' => 'name'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $orderColumn = $inspector->detectOrderColumn('public', 'custom_table');
 
         $this->assertEquals('uuid DESC', $orderColumn);
@@ -179,7 +187,7 @@ class TableInspectorTest extends TestCase
 
     public function testDetectOrderColumnUpdateAt(): void
     {
-        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
         $this->connection->method('quote')->willReturnCallback(function ($value) {
             return "'{$value}'";
         });
@@ -192,7 +200,7 @@ class TableInspectorTest extends TestCase
                 ['column_name' => 'create_at'],
             ]);
 
-        $inspector = new TableInspector($this->connection);
+        $inspector = new TableInspector($this->registry);
         $orderColumn = $inspector->detectOrderColumn('public', 'users');
 
         $this->assertEquals('update_at DESC', $orderColumn);

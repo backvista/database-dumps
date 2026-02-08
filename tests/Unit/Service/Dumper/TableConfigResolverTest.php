@@ -4,6 +4,8 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 
 class TableConfigResolverTest extends TestCase
@@ -19,7 +21,7 @@ class TableConfigResolverTest extends TestCase
             ],
             [
                 'clients' => [
-                    'clients' => ['limit' => 100, 'order_by' => 'created_at DESC']
+                    'clients' => [TableConfig::KEY_LIMIT => 100, TableConfig::KEY_ORDER_BY => 'created_at DESC']
                 ]
             ]
         );
@@ -35,6 +37,7 @@ class TableConfigResolverTest extends TestCase
         $this->assertEquals('users', $config->getTable());
         $this->assertTrue($config->isFullExport());
         $this->assertNull($config->getLimit());
+        $this->assertNull($config->getConnectionName());
     }
 
     public function testResolvePartialExportTable(): void
@@ -79,5 +82,63 @@ class TableConfigResolverTest extends TestCase
         foreach ($tables as $table) {
             $this->assertEquals('users', $table->getSchema());
         }
+    }
+
+    public function testResolveAllWithConnectionFilter(): void
+    {
+        $mysqlConfig = new DumpConfig(
+            ['app_db' => ['events', 'metrics']],
+            []
+        );
+
+        $dumpConfig = new DumpConfig(
+            ['public' => ['users']],
+            [],
+            ['mysql' => $mysqlConfig]
+        );
+
+        $resolver = new TableConfigResolver($dumpConfig);
+
+        // Дефолтное подключение
+        $tables = $resolver->resolveAll();
+        $this->assertCount(1, $tables);
+        $this->assertEquals('users', $tables[0]->getTable());
+        $this->assertNull($tables[0]->getConnectionName());
+
+        // Конкретное подключение mysql
+        $tables = $resolver->resolveAll(null, 'mysql');
+        $this->assertCount(2, $tables);
+        foreach ($tables as $table) {
+            $this->assertEquals('mysql', $table->getConnectionName());
+        }
+
+        // Все подключения
+        $tables = $resolver->resolveAll(null, ConnectionRegistryInterface::CONNECTION_ALL);
+        $this->assertCount(3, $tables);
+    }
+
+    public function testResolveWithConnectionName(): void
+    {
+        $mysqlConfig = new DumpConfig(
+            ['app_db' => ['events']],
+            ['app_db' => ['logs' => [TableConfig::KEY_LIMIT => 1000]]]
+        );
+
+        $dumpConfig = new DumpConfig(
+            ['public' => ['users']],
+            [],
+            ['mysql' => $mysqlConfig]
+        );
+
+        $resolver = new TableConfigResolver($dumpConfig);
+
+        $config = $resolver->resolve('app_db', 'events', 'mysql');
+        $this->assertEquals('events', $config->getTable());
+        $this->assertEquals('mysql', $config->getConnectionName());
+
+        $config = $resolver->resolve('app_db', 'logs', 'mysql');
+        $this->assertEquals('logs', $config->getTable());
+        $this->assertEquals(1000, $config->getLimit());
+        $this->assertEquals('mysql', $config->getConnectionName());
     }
 }

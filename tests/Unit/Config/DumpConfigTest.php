@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
 
 class DumpConfigTest extends TestCase
 {
@@ -18,8 +19,8 @@ class DumpConfigTest extends TestCase
             ],
             [
                 'clients' => [
-                    'clients' => ['limit' => 100, 'order_by' => 'created_at DESC'],
-                    'clients_attr' => ['limit' => 500]
+                    'clients' => [TableConfig::KEY_LIMIT => 100, TableConfig::KEY_ORDER_BY => 'created_at DESC'],
+                    'clients_attr' => [TableConfig::KEY_LIMIT => 500]
                 ]
             ],
         );
@@ -48,7 +49,7 @@ class DumpConfigTest extends TestCase
         $this->assertCount(2, $tables);
         $this->assertArrayHasKey('clients', $tables);
         $this->assertArrayHasKey('clients_attr', $tables);
-        $this->assertEquals(100, $tables['clients']['limit']);
+        $this->assertEquals(100, $tables['clients'][TableConfig::KEY_LIMIT]);
     }
 
     public function testGetAllFullExportSchemas(): void
@@ -73,8 +74,8 @@ class DumpConfigTest extends TestCase
         $config = $this->config->getTableConfig('clients', 'clients');
 
         $this->assertNotNull($config);
-        $this->assertEquals(100, $config['limit']);
-        $this->assertEquals('created_at DESC', $config['order_by']);
+        $this->assertEquals(100, $config[TableConfig::KEY_LIMIT]);
+        $this->assertEquals('created_at DESC', $config[TableConfig::KEY_ORDER_BY]);
     }
 
     public function testGetTableConfigFromFullExport(): void

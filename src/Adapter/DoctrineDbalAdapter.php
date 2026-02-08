@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Adapter;
 
 use Doctrine\DBAL\Connection;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 
 /**
  * Адаптер для Doctrine DBAL Connection
@@ -70,13 +71,13 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
         $className = get_class($platform);
 
         if (strpos($className, 'PostgreSQL') !== false || strpos($className, 'Postgre') !== false) {
-            return 'postgresql';
+            return PlatformFactory::POSTGRESQL;
         }
 
         if (strpos($className, 'MySQL') !== false || strpos($className, 'MariaDb') !== false) {
-            return 'mysql';
+            return PlatformFactory::MYSQL;
         }
 
-        return 'postgresql';
+        return PlatformFactory::POSTGRESQL;
     }
 }

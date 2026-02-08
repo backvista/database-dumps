@@ -53,9 +53,9 @@ class TableConfigTest extends TestCase
     public function testFromArrayPartialExport(): void
     {
         $config = TableConfig::fromArray('clients', 'clients', [
-            'limit' => 100,
-            'where' => 'is_active = true',
-            'order_by' => 'created_at DESC'
+            TableConfig::KEY_LIMIT => 100,
+            TableConfig::KEY_WHERE => 'is_active = true',
+            TableConfig::KEY_ORDER_BY => 'created_at DESC'
         ]);
 
         $this->assertEquals('clients', $config->getSchema());
@@ -64,5 +64,31 @@ class TableConfigTest extends TestCase
         $this->assertEquals('is_active = true', $config->getWhere());
         $this->assertEquals('created_at DESC', $config->getOrderBy());
         $this->assertTrue($config->isPartialExport());
+    }
+
+    public function testConnectionNameDefaultIsNull(): void
+    {
+        $config = new TableConfig('users', 'users');
+        $this->assertNull($config->getConnectionName());
+    }
+
+    public function testConnectionNameFromConstructor(): void
+    {
+        $config = new TableConfig('users', 'users', null, null, null, 'mysql');
+        $this->assertEquals('mysql', $config->getConnectionName());
+    }
+
+    public function testFromArrayWithConnectionName(): void
+    {
+        $config = TableConfig::fromArray('app_db', 'events', [TableConfig::KEY_LIMIT => 500], 'mysql');
+        $this->assertEquals('mysql', $config->getConnectionName());
+        $this->assertEquals('app_db', $config->getSchema());
+        $this->assertEquals(500, $config->getLimit());
+    }
+
+    public function testFromArrayWithoutConnectionName(): void
+    {
+        $config = TableConfig::fromArray('public', 'users', []);
+        $this->assertNull($config->getConnectionName());
     }
 }

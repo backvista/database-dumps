@@ -7,6 +7,11 @@ namespace BackVista\DatabaseDumps\Config;
  */
 class DumpConfig
 {
+    public const KEY_FULL_EXPORT = 'full_export';
+    public const KEY_PARTIAL_EXPORT = 'partial_export';
+    public const KEY_CONNECTIONS = 'connections';
+    public const DUMPS_DIR = 'database/dumps';
+
     /**
      * @var array<string, array<string>> Полный экспорт по схемам
      */
@@ -18,15 +23,23 @@ class DumpConfig
     private array $partialExport;
 
     /**
+     * @var array<string, DumpConfig> Конфигурации дополнительных подключений
+     */
+    private array $connections;
+
+    /**
      * @param array<string, array<string>> $fullExport Полный экспорт по схемам
      * @param array<string, array<string, array<string, mixed>>> $partialExport Частичный экспорт с условиями
+     * @param array<string, DumpConfig> $connections Конфигурации дополнительных подключений
      */
     public function __construct(
         array $fullExport,
-        array $partialExport
+        array $partialExport,
+        array $connections = []
     ) {
         $this->fullExport = $fullExport;
         $this->partialExport = $partialExport;
+        $this->connections = $connections;
     }
 
     /**
@@ -87,5 +100,31 @@ class DumpConfig
         }
 
         return null;
+    }
+
+    /**
+     * Получить конфигурации дополнительных подключений
+     *
+     * @return array<string, DumpConfig>
+     */
+    public function getConnectionConfigs(): array
+    {
+        return $this->connections;
+    }
+
+    /**
+     * Получить конфигурацию конкретного подключения
+     */
+    public function getConnectionConfig(string $name): ?DumpConfig
+    {
+        return $this->connections[$name] ?? null;
+    }
+
+    /**
+     * Есть ли дополнительные подключения
+     */
+    public function isMultiConnection(): bool
+    {
+        return !empty($this->connections);
     }
 }

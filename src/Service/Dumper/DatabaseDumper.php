@@ -2,6 +2,7 @@
 
 namespace BackVista\DatabaseDumps\Service\Dumper;
 
+use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
@@ -48,7 +49,7 @@ class DatabaseDumper
             $sql = $this->sqlGenerator->generate($config, $rows);
 
             // 3. Сохранение файла
-            $filename = $this->projectDir . "/database/dumps/{$config->getSchema()}/{$config->getTable()}.sql";
+            $filename = $this->buildDumpPath($config);
             $this->ensureDirectoryExists(dirname($filename));
             $this->fileSystem->write($filename, $sql);
 
@@ -74,6 +75,25 @@ class DatabaseDumper
         }
 
         $this->logger->info("Экспортировано таблиц: {$total}");
+    }
+
+    /**
+     * Построить путь к dump-файлу
+     *
+     * Дефолтное подключение: database/dumps/{schema}/{table}.sql
+     * Именованное подключение: database/dumps/{connection}/{schema}/{table}.sql
+     */
+    private function buildDumpPath(TableConfig $config): string
+    {
+        $connectionName = $config->getConnectionName();
+
+        $dumpsDir = DumpConfig::DUMPS_DIR;
+
+        if ($connectionName !== null) {
+            return $this->projectDir . "/{$dumpsDir}/{$connectionName}/{$config->getSchema()}/{$config->getTable()}.sql";
+        }
+
+        return $this->projectDir . "/{$dumpsDir}/{$config->getSchema()}/{$config->getTable()}.sql";
     }
 
     /**

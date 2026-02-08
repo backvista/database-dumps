@@ -11,28 +11,28 @@ class PlatformFactoryTest extends TestCase
 {
     public function testCreatePostgresql(): void
     {
-        $platform = PlatformFactory::create('postgresql');
+        $platform = PlatformFactory::create(PlatformFactory::POSTGRESQL);
 
         $this->assertInstanceOf(PostgresPlatform::class, $platform);
     }
 
     public function testCreatePgsql(): void
     {
-        $platform = PlatformFactory::create('pgsql');
+        $platform = PlatformFactory::create(PlatformFactory::PGSQL);
 
         $this->assertInstanceOf(PostgresPlatform::class, $platform);
     }
 
     public function testCreateMysql(): void
     {
-        $platform = PlatformFactory::create('mysql');
+        $platform = PlatformFactory::create(PlatformFactory::MYSQL);
 
         $this->assertInstanceOf(MySqlPlatform::class, $platform);
     }
 
     public function testCreateMariadb(): void
     {
-        $platform = PlatformFactory::create('mariadb');
+        $platform = PlatformFactory::create(PlatformFactory::MARIADB);
 
         $this->assertInstanceOf(MySqlPlatform::class, $platform);
     }

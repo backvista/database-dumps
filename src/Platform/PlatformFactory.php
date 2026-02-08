@@ -9,6 +9,11 @@ use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
  */
 class PlatformFactory
 {
+    public const POSTGRESQL = 'postgresql';
+    public const PGSQL = 'pgsql';
+    public const MYSQL = 'mysql';
+    public const MARIADB = 'mariadb';
+
     /**
      * @param string $platformName Имя платформы (postgresql, pgsql, mysql, mariadb)
      * @return DatabasePlatformInterface
@@ -19,11 +24,11 @@ class PlatformFactory
         $normalized = strtolower(trim($platformName));
 
         switch ($normalized) {
-            case 'postgresql':
-            case 'pgsql':
+            case self::POSTGRESQL:
+            case self::PGSQL:
                 return new PostgresPlatform();
-            case 'mysql':
-            case 'mariadb':
+            case self::MYSQL:
+            case self::MARIADB:
                 return new MySqlPlatform();
             default:
                 throw new \InvalidArgumentException("Неподдерживаемая платформа БД: {$platformName}");

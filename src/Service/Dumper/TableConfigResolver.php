@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Service\Dumper;
 
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
 /**
  * Получение конфигурации таблицы для экспорта
@@ -20,11 +21,12 @@ class TableConfigResolver
     /**
      * Получить конфигурацию для таблицы
      */
-    public function resolve(string $schema, string $table): TableConfig
+    public function resolve(string $schema, string $table, ?string $connectionName = null): TableConfig
     {
-        $config = $this->dumpConfig->getTableConfig($schema, $table);
+        $config = $this->getEffectiveConfig($connectionName);
+        $tableConfig = $config->getTableConfig($schema, $table);
 
-        return TableConfig::fromArray($schema, $table, $config ?? []);
+        return TableConfig::fromArray($schema, $table, $tableConfig ?? [], $connectionName);
     }
 
     /**
@@ -32,18 +34,19 @@ class TableConfigResolver
      *
      * @return array<TableConfig>
      */
-    public function resolveAllFromSchema(string $schema): array
+    public function resolveAllFromSchema(string $schema, ?string $connectionName = null): array
     {
+        $config = $this->getEffectiveConfig($connectionName);
         $tables = [];
 
         // Full export таблицы
-        foreach ($this->dumpConfig->getFullExportTables($schema) as $table) {
-            $tables[] = $this->resolve($schema, $table);
+        foreach ($config->getFullExportTables($schema) as $table) {
+            $tables[] = TableConfig::fromArray($schema, $table, [], $connectionName);
         }
 
         // Partial export таблицы
-        foreach ($this->dumpConfig->getPartialExportTables($schema) as $table => $config) {
-            $tables[] = TableConfig::fromArray($schema, $table, $config);
+        foreach ($config->getPartialExportTables($schema) as $table => $tableConf) {
+            $tables[] = TableConfig::fromArray($schema, $table, $tableConf, $connectionName);
         }
 
         return $tables;
@@ -52,39 +55,86 @@ class TableConfigResolver
     /**
      * Получить все таблицы для экспорта (все схемы)
      *
+     * @param string|null $schemaFilter Фильтр по схеме
+     * @param string|null $connectionFilter Фильтр по подключению (null = дефолтное, 'all' = все)
      * @return array<TableConfig>
      */
-    public function resolveAll(?string $schemaFilter = null): array
+    public function resolveAll(?string $schemaFilter = null, ?string $connectionFilter = null): array
     {
         $tables = [];
 
+        if ($connectionFilter === ConnectionRegistryInterface::CONNECTION_ALL) {
+            // Дефолтное подключение
+            $tables = array_merge($tables, $this->resolveTablesFromConfig($this->dumpConfig, $schemaFilter, null));
+
+            // Все дополнительные подключения
+            foreach ($this->dumpConfig->getConnectionConfigs() as $connName => $connConfig) {
+                $tables = array_merge($tables, $this->resolveTablesFromConfig($connConfig, $schemaFilter, $connName));
+            }
+        } elseif ($connectionFilter !== null) {
+            // Конкретное подключение
+            $connConfig = $this->dumpConfig->getConnectionConfig($connectionFilter);
+            if ($connConfig !== null) {
+                $tables = $this->resolveTablesFromConfig($connConfig, $schemaFilter, $connectionFilter);
+            }
+        } else {
+            // Дефолтное подключение
+            $tables = $this->resolveTablesFromConfig($this->dumpConfig, $schemaFilter, null);
+        }
+
+        return $tables;
+    }
+
+    /**
+     * Получить DumpConfig для данного подключения
+     */
+    private function getEffectiveConfig(?string $connectionName): DumpConfig
+    {
+        if ($connectionName === null) {
+            return $this->dumpConfig;
+        }
+
+        $connConfig = $this->dumpConfig->getConnectionConfig($connectionName);
+
+        return $connConfig ?? $this->dumpConfig;
+    }
+
+    /**
+     * Получить таблицы из конкретного DumpConfig
+     *
+     * @return array<TableConfig>
+     */
+    private function resolveTablesFromConfig(DumpConfig $config, ?string $schemaFilter, ?string $connectionName): array
+    {
+        $tables = [];
+        $addedTables = [];
+
         // Full export
-        foreach ($this->dumpConfig->getAllFullExportSchemas() as $schema) {
+        foreach ($config->getAllFullExportSchemas() as $schema) {
             if ($schemaFilter && $schema !== $schemaFilter) {
                 continue;
             }
 
-            $tables = array_merge($tables, $this->resolveAllFromSchema($schema));
+            foreach ($config->getFullExportTables($schema) as $table) {
+                $key = $schema . '.' . $table;
+                if (!isset($addedTables[$key])) {
+                    $tables[] = TableConfig::fromArray($schema, $table, [], $connectionName);
+                    $addedTables[$key] = true;
+                }
+            }
         }
 
         // Partial export
-        foreach ($this->dumpConfig->getAllPartialExportSchemas() as $schema) {
+        foreach ($config->getAllPartialExportSchemas() as $schema) {
             if ($schemaFilter && $schema !== $schemaFilter) {
                 continue;
             }
 
-            foreach ($this->dumpConfig->getPartialExportTables($schema) as $table => $config) {
-                // Пропускаем если уже добавлено в full export
-                $exists = false;
-                foreach ($tables as $existingTable) {
-                    if ($existingTable->getSchema() === $schema && $existingTable->getTable() === $table) {
-                        $exists = true;
-                        break;
-                    }
-                }
-
-                if (!$exists) {
-                    $tables[] = TableConfig::fromArray($schema, $table, $config);
+            foreach ($config->getPartialExportTables($schema) as $table => $tableConf) {
+                $key = $schema . '.' . $table;
+                if (!isset($addedTables[$key])) {
+                    $tables[] = TableConfig::fromArray($schema, $table, $tableConf, $connectionName);
+                    $addedTables[$key] = true;
                 }
             }
         }

@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Adapter;
 
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use Illuminate\Database\Connection;
 
 /**
@@ -86,11 +87,11 @@ class LaravelDatabaseAdapter implements DatabaseConnectionInterface
         $driver = $this->connection->getDriverName();
 
         switch ($driver) {
-            case 'pgsql':
-                return 'postgresql';
-            case 'mysql':
-            case 'mariadb':
-                return 'mysql';
+            case PlatformFactory::PGSQL:
+                return PlatformFactory::POSTGRESQL;
+            case PlatformFactory::MYSQL:
+            case PlatformFactory::MARIADB:
+                return PlatformFactory::MYSQL;
             default:
                 return $driver;
         }

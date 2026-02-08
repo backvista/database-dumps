@@ -2,7 +2,8 @@
 
 namespace BackVista\DatabaseDumps\Service\Importer;
 
-use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Exception\ImportFailedException;
@@ -14,7 +15,11 @@ use BackVista\DatabaseDumps\Service\Security\ProductionGuard;
  */
 class DatabaseImporter
 {
-    private DatabaseConnectionInterface $connection;
+    public const BEFORE_EXEC_DIR = 'database/before_exec';
+    public const AFTER_EXEC_DIR = 'database/after_exec';
+
+    private ConnectionRegistryInterface $registry;
+    private DumpConfig $dumpConfig;
     private FileSystemInterface $fileSystem;
     private ProductionGuard $productionGuard;
     private TransactionManager $transactionManager;
@@ -24,7 +29,8 @@ class DatabaseImporter
     private string $projectDir;
 
     public function __construct(
-        DatabaseConnectionInterface $connection,
+        ConnectionRegistryInterface $registry,
+        DumpConfig $dumpConfig,
         FileSystemInterface $fileSystem,
         ProductionGuard $productionGuard,
         TransactionManager $transactionManager,
@@ -33,7 +39,8 @@ class DatabaseImporter
         LoggerInterface $logger,
         string $projectDir
     ) {
-        $this->connection = $connection;
+        $this->registry = $registry;
+        $this->dumpConfig = $dumpConfig;
         $this->fileSystem = $fileSystem;
         $this->productionGuard = $productionGuard;
         $this->transactionManager = $transactionManager;
@@ -49,42 +56,86 @@ class DatabaseImporter
      * @param bool $skipBefore Пропустить before_exec скрипты
      * @param bool $skipAfter Пропустить after_exec скрипты
      * @param string|null $schemaFilter Фильтр по схеме
+     * @param string|null $connectionFilter Фильтр по подключению (null = дефолтное, 'all' = все)
      * @throws ImportFailedException
      */
     public function import(
         bool $skipBefore = false,
         bool $skipAfter = false,
-        ?string $schemaFilter = null
+        ?string $schemaFilter = null,
+        ?string $connectionFilter = null
     ): void {
         // 1. Проверка окружения (защита от prod)
         $this->productionGuard->ensureSafeForImport();
 
-        // 2. Импорт в транзакции
-        $this->transactionManager->transaction(function () use ($skipBefore, $skipAfter, $schemaFilter) {
-            // 3. Before exec скрипты
-            if (!$skipBefore) {
+        // 2. Определить подключения для импорта
+        $connectionNames = $this->resolveConnectionNames($connectionFilter);
+
+        // 3. Per-connection import с транзакциями
+        foreach ($connectionNames as $connName) {
+            $this->importForConnection($connName, $skipBefore, $skipAfter, $schemaFilter);
+        }
+    }
+
+    /**
+     * Импорт для одного подключения
+     */
+    private function importForConnection(
+        ?string $connectionName,
+        bool $skipBefore,
+        bool $skipAfter,
+        ?string $schemaFilter
+    ): void {
+        $label = $connectionName ?? 'default';
+        $this->logger->info("Импорт подключения: {$label}");
+
+        $this->transactionManager->transaction(function () use ($connectionName, $skipBefore, $skipAfter, $schemaFilter) {
+            // Before exec скрипты — на дефолтном подключении
+            if (!$skipBefore && $connectionName === null) {
                 $this->logger->info('1. Выполнение before_exec скриптов');
-                $this->scriptExecutor->executeScripts($this->projectDir . '/database/before_exec');
+                $this->scriptExecutor->executeScripts($this->projectDir . '/' . self::BEFORE_EXEC_DIR);
             }
 
-            // 4. Импорт дампов
+            // Импорт дампов
             $this->logger->info('2. Импорт SQL дампов');
-            $this->importDumps($schemaFilter);
+            $this->importDumps($schemaFilter, $connectionName);
 
-            // 5. After exec скрипты
-            if (!$skipAfter) {
+            // After exec скрипты — на дефолтном подключении
+            if (!$skipAfter && $connectionName === null) {
                 $this->logger->info('3. Выполнение after_exec скриптов');
-                $this->scriptExecutor->executeScripts($this->projectDir . '/database/after_exec');
+                $this->scriptExecutor->executeScripts($this->projectDir . '/' . self::AFTER_EXEC_DIR);
             }
-        });
+        }, $connectionName);
+    }
+
+    /**
+     * Определить список подключений для импорта
+     *
+     * @return array<string|null>
+     */
+    private function resolveConnectionNames(?string $connectionFilter): array
+    {
+        if ($connectionFilter === ConnectionRegistryInterface::CONNECTION_ALL) {
+            $names = [null]; // дефолтное
+            foreach (array_keys($this->dumpConfig->getConnectionConfigs()) as $connName) {
+                $names[] = $connName;
+            }
+            return $names;
+        }
+
+        if ($connectionFilter !== null) {
+            return [$connectionFilter];
+        }
+
+        return [null]; // дефолтное
     }
 
     /**
      * Импортировать дампы из директории
      */
-    private function importDumps(?string $schemaFilter): void
+    private function importDumps(?string $schemaFilter, ?string $connectionName): void
     {
-        $dumpsPath = $this->projectDir . '/database/dumps';
+        $dumpsPath = $this->buildDumpsPath($connectionName);
 
         if (!$this->fileSystem->isDirectory($dumpsPath)) {
             throw ImportFailedException::dumpsNotFound($dumpsPath);
@@ -100,15 +151,31 @@ class DatabaseImporter
         // Сортировка для предсказуемого порядка
         sort($files);
 
+        $connection = $this->registry->getConnection($connectionName);
+
         foreach ($files as $file) {
-            $this->importDumpFile($file, $schemaFilter);
+            $this->importDumpFile($file, $schemaFilter, $connection);
         }
     }
 
     /**
-     * Импортировать один файл дампа
+     * Построить путь к директории дампов
      */
-    private function importDumpFile(string $filePath, ?string $schemaFilter): void
+    private function buildDumpsPath(?string $connectionName): string
+    {
+        if ($connectionName !== null) {
+            return $this->projectDir . '/' . DumpConfig::DUMPS_DIR . '/' . $connectionName;
+        }
+
+        return $this->projectDir . '/' . DumpConfig::DUMPS_DIR;
+    }
+
+    /**
+     * Импортировать один файл дампа
+     *
+     * @param \BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface $connection
+     */
+    private function importDumpFile(string $filePath, ?string $schemaFilter, $connection): void
     {
         // Извлечение schema из пути: database/dumps/{schema}/{table}.sql
         $pathParts = explode(DIRECTORY_SEPARATOR, $filePath);
@@ -128,7 +195,7 @@ class DatabaseImporter
 
         foreach ($statements as $statement) {
             if (!empty(trim($statement))) {
-                $this->connection->executeStatement($statement);
+                $connection->executeStatement($statement);
             }
         }
 

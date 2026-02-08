@@ -20,9 +20,22 @@ class YamlConfigLoader implements ConfigLoaderInterface
 
         $data = Yaml::parseFile($path);
 
+        $connections = [];
+        if (isset($data[DumpConfig::KEY_CONNECTIONS]) && is_array($data[DumpConfig::KEY_CONNECTIONS])) {
+            foreach ($data[DumpConfig::KEY_CONNECTIONS] as $connName => $connData) {
+                if (is_array($connData)) {
+                    $connections[(string) $connName] = new DumpConfig(
+                        $connData[DumpConfig::KEY_FULL_EXPORT] ?? [],
+                        $connData[DumpConfig::KEY_PARTIAL_EXPORT] ?? []
+                    );
+                }
+            }
+        }
+
         return new DumpConfig(
-            $data['full_export'] ?? [],
-            $data['partial_export'] ?? []
+            $data[DumpConfig::KEY_FULL_EXPORT] ?? [],
+            $data[DumpConfig::KEY_PARTIAL_EXPORT] ?? [],
+            $connections
         );
     }
 }
