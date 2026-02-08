@@ -3,7 +3,7 @@
   "title": "Database Dumps Configuration",
   "description": "Конфигурация экспорта дампов БД (backvista/database-dumps)",
   "type": "object",
-  "properties": {
+  "definitions": {
     "full_export": {
       "description": "Полный экспорт таблиц (все строки). Ключ — имя схемы, значение — список таблиц.",
       "type": "object",
@@ -43,6 +43,31 @@
           },
           "additionalProperties": false
         }
+      }
+    }
+  },
+  "properties": {
+    "full_export": {
+      "$ref": "#/definitions/full_export"
+    },
+    "partial_export": {
+      "$ref": "#/definitions/partial_export"
+    },
+    "connections": {
+      "description": "Дополнительные подключения к БД. Ключ — имя подключения из config/database.php (Laravel) или doctrine.yaml (Symfony).",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Конфигурация экспорта для подключения",
+        "properties": {
+          "full_export": {
+            "$ref": "#/definitions/full_export"
+          },
+          "partial_export": {
+            "$ref": "#/definitions/partial_export"
+          }
+        },
+        "additionalProperties": false
       }
     }
   },

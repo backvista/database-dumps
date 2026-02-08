@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class DbInitCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:import {--skip-before : Пропустить before_exec скрипты} {--skip-after : Пропустить after_exec скрипты} {--schema= : Импорт только указанной схемы}';
+    protected $signature = 'dbdump:import {--skip-before : Пропустить before_exec скрипты} {--skip-after : Пропустить after_exec скрипты} {--schema= : Импорт только указанной схемы} {--connection= : Имя подключения (или "all" для всех)}';
 
     /** @var string */
     protected $description = 'Инициализация БД с импортом SQL дампов';
@@ -39,10 +39,13 @@ class DbInitCommand extends Command
         try {
             /** @var string|null $schema */
             $schema = $this->option('schema');
+            /** @var string|null $connection */
+            $connection = $this->option('connection');
             $this->importer->import(
                 (bool) $this->option('skip-before'),
                 (bool) $this->option('skip-after'),
-                $schema
+                $schema,
+                $connection
             );
 
             $duration = round(microtime(true) - $startTime, 2);

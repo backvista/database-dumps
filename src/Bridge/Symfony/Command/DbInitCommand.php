@@ -26,7 +26,8 @@ class DbInitCommand extends Command
             ->setDescription('Инициализация БД с импортом SQL дампов')
             ->addOption('skip-before', null, InputOption::VALUE_NONE, 'Пропустить before_exec скрипты')
             ->addOption('skip-after', null, InputOption::VALUE_NONE, 'Пропустить after_exec скрипты')
-            ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Импорт только указанной схемы');
+            ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Импорт только указанной схемы')
+            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,7 +42,8 @@ class DbInitCommand extends Command
             $this->importer->import(
                 $input->getOption('skip-before'),
                 $input->getOption('skip-after'),
-                $input->getOption('schema')
+                $input->getOption('schema'),
+                $input->getOption('connection')
             );
 
             $duration = round(microtime(true) - $startTime, 2);

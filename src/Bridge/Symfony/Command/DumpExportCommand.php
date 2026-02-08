@@ -2,8 +2,6 @@
 
 namespace BackVista\DatabaseDumps\Bridge\Symfony\Command;
 
-use BackVista\DatabaseDumps\Config\TableConfig;
-use BackVista\DatabaseDumps\Exception\ExportFailedException;
 use BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper;
 use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 use Symfony\Component\Console\Command\Command;
@@ -33,7 +31,8 @@ class DumpExportCommand extends Command
             ->setName('app:dbdump:export')
             ->setDescription('Экспорт SQL дампа таблицы из БД (schema.table или "all")')
             ->addArgument('table', InputArgument::REQUIRED, 'Имя таблицы (schema.table) или "all" для всех таблиц')
-            ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Фильтр по схеме для "all"');
+            ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Фильтр по схеме для "all"')
+            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,7 +44,7 @@ class DumpExportCommand extends Command
             return $this->exportAll($input, $io);
         }
 
-        return $this->exportTable($table, $io);
+        return $this->exportTable($input, $table, $io);
     }
 
     private function exportAll(InputInterface $input, SymfonyStyle $io): int
@@ -53,10 +52,11 @@ class DumpExportCommand extends Command
         $io->title('Экспорт всех таблиц согласно конфигурации');
 
         $schemaFilter = $input->getOption('schema');
+        $connectionFilter = $input->getOption('connection');
         $startTime = microtime(true);
 
         try {
-            $tables = $this->configResolver->resolveAll($schemaFilter);
+            $tables = $this->configResolver->resolveAll($schemaFilter, $connectionFilter);
 
             if (empty($tables)) {
                 $io->warning('Нет таблиц для экспорта в конфигурации');
@@ -82,7 +82,7 @@ class DumpExportCommand extends Command
         }
     }
 
-    private function exportTable(string $fullTableName, SymfonyStyle $io): int
+    private function exportTable(InputInterface $input, string $fullTableName, SymfonyStyle $io): int
     {
         // Разбор schema.table
         if (strpos($fullTableName, '.') === false) {
@@ -90,12 +90,14 @@ class DumpExportCommand extends Command
             return Command::FAILURE;
         }
 
+        $connectionFilter = $input->getOption('connection');
+
         [$schema, $table] = explode('.', $fullTableName, 2);
 
         $io->text("Экспорт: {$fullTableName}");
 
         try {
-            $config = $this->configResolver->resolve($schema, $table);
+            $config = $this->configResolver->resolve($schema, $table, $connectionFilter);
             $this->dumper->exportTable($config);
 
             return Command::SUCCESS;

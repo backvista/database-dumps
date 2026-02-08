@@ -9,6 +9,7 @@ use BackVista\DatabaseDumps\Bridge\Laravel\Command\PrepareConfigCommand;
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\EnvironmentConfig;
 use BackVista\DatabaseDumps\Contract\ConfigLoaderInterface;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
@@ -17,6 +18,7 @@ use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigGenerator;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\ServiceTableFilter;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\TableInspector;
+use BackVista\DatabaseDumps\Service\ConnectionRegistry;
 use BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
 use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
@@ -44,22 +46,11 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/config/database-dumps.php', 'database-dumps');
 
-        $this->app->singleton(DatabaseConnectionInterface::class, function ($app) {
-            return new LaravelDatabaseAdapter($app['db']->connection());
-        });
-
         $this->app->singleton(FileSystemInterface::class, FileSystemHelper::class);
         $this->app->singleton(ConfigLoaderInterface::class, YamlConfigLoader::class);
 
         $this->app->singleton(LoggerInterface::class, function () {
             return new LaravelLogger();
-        });
-
-        $this->app->singleton(DatabasePlatformInterface::class, function ($app) {
-            /** @var DatabaseConnectionInterface $connection */
-            $connection = $app->make(DatabaseConnectionInterface::class);
-
-            return PlatformFactory::create($connection->getPlatformName());
         });
 
         $this->app->singleton(EnvironmentConfig::class, function () {
@@ -79,6 +70,35 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
             return $loader->load($configPath);
         });
 
+        // Обратная совместимость: singleton connection/platform для внешнего кода
+        $this->app->singleton(DatabaseConnectionInterface::class, function ($app) {
+            return new LaravelDatabaseAdapter($app['db']->connection());
+        });
+
+        $this->app->singleton(DatabasePlatformInterface::class, function ($app) {
+            /** @var DatabaseConnectionInterface $connection */
+            $connection = $app->make(DatabaseConnectionInterface::class);
+
+            return PlatformFactory::create($connection->getPlatformName());
+        });
+
+        // ConnectionRegistry — реестр подключений
+        $this->app->singleton(ConnectionRegistryInterface::class, function ($app) {
+            $registry = new ConnectionRegistry('default');
+            $registry->register('default', new LaravelDatabaseAdapter($app['db']->connection()));
+
+            // Читаем имена подключений из DumpConfig
+            /** @var DumpConfig $dumpConfig */
+            $dumpConfig = $app->make(DumpConfig::class);
+            foreach (array_keys($dumpConfig->getConnectionConfigs()) as $connName) {
+                $registry->register($connName, new LaravelDatabaseAdapter(
+                    $app['db']->connection($connName)
+                ));
+            }
+
+            return $registry;
+        });
+
         $this->app->singleton(EnvironmentChecker::class);
         $this->app->singleton(ProductionGuard::class);
         $this->app->singleton(StatementSplitter::class);
@@ -96,7 +116,16 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
 
         $this->app->singleton(ServiceTableFilter::class);
         $this->app->singleton(TableInspector::class);
-        $this->app->singleton(ConfigGenerator::class);
+
+        $this->app->singleton(ConfigGenerator::class, function ($app) {
+            return new ConfigGenerator(
+                $app->make(TableInspector::class),
+                $app->make(ServiceTableFilter::class),
+                $app->make(FileSystemInterface::class),
+                $app->make(LoggerInterface::class),
+                $app->make(ConnectionRegistryInterface::class)
+            );
+        });
 
         $this->app->singleton(PrepareConfigCommand::class, function ($app) {
             return new PrepareConfigCommand(
@@ -118,7 +147,8 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
 
         $this->app->singleton(DatabaseImporter::class, function ($app) {
             return new DatabaseImporter(
-                $app->make(DatabaseConnectionInterface::class),
+                $app->make(ConnectionRegistryInterface::class),
+                $app->make(DumpConfig::class),
                 $app->make(FileSystemInterface::class),
                 $app->make(ProductionGuard::class),
                 $app->make(TransactionManager::class),

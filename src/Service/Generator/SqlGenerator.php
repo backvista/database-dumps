@@ -34,6 +34,7 @@ class SqlGenerator
     {
         $schema = $config->getSchema();
         $table = $config->getTable();
+        $connectionName = $config->getConnectionName();
 
         $sql = "-- Дамп таблицы: {$schema}.{$table}\n";
         $sql .= "-- Дата экспорта: " . date('Y-m-d H:i:s') . "\n";
@@ -48,14 +49,14 @@ class SqlGenerator
         $sql .= "\n";
 
         // TRUNCATE
-        $sql .= $this->truncateGenerator->generate($schema, $table);
+        $sql .= $this->truncateGenerator->generate($schema, $table, $connectionName);
         $sql .= "\n";
 
         // INSERT
-        $sql .= $this->insertGenerator->generate($schema, $table, $rows);
+        $sql .= $this->insertGenerator->generate($schema, $table, $rows, $connectionName);
 
         // Sequence reset
-        $sql .= $this->sequenceGenerator->generate($schema, $table);
+        $sql .= $this->sequenceGenerator->generate($schema, $table, $connectionName);
 
         return $sql;
     }

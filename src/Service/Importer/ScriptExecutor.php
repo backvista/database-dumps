@@ -2,6 +2,7 @@
 
 namespace BackVista\DatabaseDumps\Service\Importer;
 
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
@@ -12,27 +13,36 @@ use BackVista\DatabaseDumps\Service\Parser\SqlParser;
  */
 class ScriptExecutor
 {
-    private DatabaseConnectionInterface $connection;
+    private ConnectionRegistryInterface $registry;
     private FileSystemInterface $fileSystem;
     private SqlParser $parser;
     private LoggerInterface $logger;
 
     public function __construct(
-        DatabaseConnectionInterface $connection,
+        ConnectionRegistryInterface $registry,
         FileSystemInterface $fileSystem,
         SqlParser $parser,
         LoggerInterface $logger
     ) {
-        $this->connection = $connection;
+        $this->registry = $registry;
         $this->fileSystem = $fileSystem;
         $this->parser = $parser;
         $this->logger = $logger;
     }
 
     /**
-     * Выполнить скрипты из директории
+     * Выполнить скрипты из директории (на дефолтном подключении)
      */
     public function executeScripts(string $directory): void
+    {
+        $connection = $this->registry->getConnection();
+        $this->executeScriptsOn($connection, $directory);
+    }
+
+    /**
+     * Выполнить скрипты из директории на указанном подключении
+     */
+    public function executeScriptsOn(DatabaseConnectionInterface $connection, string $directory): void
     {
         if (!$this->fileSystem->isDirectory($directory)) {
             $this->logger->info("Директория не найдена: {$directory}");
@@ -50,14 +60,14 @@ class ScriptExecutor
         sort($files);
 
         foreach ($files as $file) {
-            $this->executeScript($file);
+            $this->executeScript($connection, $file);
         }
     }
 
     /**
      * Выполнить один SQL скрипт
      */
-    private function executeScript(string $filePath): void
+    private function executeScript(DatabaseConnectionInterface $connection, string $filePath): void
     {
         $filename = basename($filePath);
         $this->logger->info("Выполнение: {$filename}");
@@ -67,7 +77,7 @@ class ScriptExecutor
 
         foreach ($statements as $statement) {
             if (!empty(trim($statement))) {
-                $this->connection->executeStatement($statement);
+                $connection->executeStatement($statement);
             }
         }
 

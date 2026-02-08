@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
@@ -20,7 +21,12 @@ class DataFetcherTest extends TestCase
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
         $platform = new PostgresPlatform();
-        $this->fetcher = new DataFetcher($this->connection, $platform);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $this->fetcher = new DataFetcher($registry);
     }
 
     public function testFetchFullExport(): void

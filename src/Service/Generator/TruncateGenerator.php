@@ -2,26 +2,28 @@
 
 namespace BackVista\DatabaseDumps\Service\Generator;
 
-use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
 /**
  * Генерация TRUNCATE statements
  */
 class TruncateGenerator
 {
-    /** @var DatabasePlatformInterface */
-    private $platform;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
 
-    public function __construct(DatabasePlatformInterface $platform)
+    public function __construct(ConnectionRegistryInterface $registry)
     {
-        $this->platform = $platform;
+        $this->registry = $registry;
     }
 
     /**
      * Сгенерировать TRUNCATE statement
      */
-    public function generate(string $schema, string $table): string
+    public function generate(string $schema, string $table, ?string $connectionName = null): string
     {
-        return $this->platform->getTruncateStatement($schema, $table);
+        $platform = $this->registry->getPlatform($connectionName);
+
+        return $platform->getTruncateStatement($schema, $table);
     }
 }
