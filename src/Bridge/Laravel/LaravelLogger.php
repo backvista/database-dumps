@@ -20,6 +20,14 @@ class LaravelLogger implements LoggerInterface
         $this->outputCallback = $outputCallback;
     }
 
+    /**
+     * @param callable $callback
+     */
+    public function setOutputCallback($callback): void
+    {
+        $this->outputCallback = $callback;
+    }
+
     public function info(string $message): void
     {
         $this->output($message);

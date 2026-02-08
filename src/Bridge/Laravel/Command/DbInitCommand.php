@@ -82,10 +82,9 @@ HELP;
     {
         if ($this->logger instanceof LaravelLogger) {
             $command = $this;
-            $this->logger = new LaravelLogger(function ($message) use ($command) {
+            $this->logger->setOutputCallback(function ($message) use ($command) {
                 $command->line($message);
             });
-            $this->getLaravel()->instance(LoggerInterface::class, $this->logger);
         }
     }
 }
