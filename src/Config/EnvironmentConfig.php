@@ -23,7 +23,7 @@ class EnvironmentConfig
      */
     public function __construct(
         string $currentEnv,
-        array $productionEnvs = ['prod', 'predprod']
+        array $productionEnvs = ['prod', 'production', 'predprod']
     ) {
         $this->currentEnv = $currentEnv;
         $this->productionEnvs = $productionEnvs;
