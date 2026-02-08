@@ -66,7 +66,7 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
             $configPath = $app['config']->get('database-dumps.config_path');
 
             if (!file_exists($configPath)) {
-                return new DumpConfig([], [], []);
+                return new DumpConfig([], []);
             }
 
             /** @var ConfigLoaderInterface $loader */

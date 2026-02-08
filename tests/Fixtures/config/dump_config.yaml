@@ -16,7 +16,3 @@ partial_export:
     clients_attr:
       limit: 500
       order_by: client_id DESC
-
-exclude:
-  - sessions
-  - cache

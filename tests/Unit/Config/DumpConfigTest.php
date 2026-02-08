@@ -22,7 +22,6 @@ class DumpConfigTest extends TestCase
                     'clients_attr' => ['limit' => 500]
                 ]
             ],
-            ['sessions', 'cache']
         );
     }
 
@@ -67,13 +66,6 @@ class DumpConfigTest extends TestCase
 
         $this->assertCount(1, $schemas);
         $this->assertContains('clients', $schemas);
-    }
-
-    public function testIsExcluded(): void
-    {
-        $this->assertTrue($this->config->isExcluded('sessions'));
-        $this->assertTrue($this->config->isExcluded('cache'));
-        $this->assertFalse($this->config->isExcluded('users'));
     }
 
     public function testGetTableConfigFromPartialExport(): void

@@ -22,8 +22,7 @@ class YamlConfigLoader implements ConfigLoaderInterface
 
         return new DumpConfig(
             $data['full_export'] ?? [],
-            $data['partial_export'] ?? [],
-            $data['exclude'] ?? []
+            $data['partial_export'] ?? []
         );
     }
 }

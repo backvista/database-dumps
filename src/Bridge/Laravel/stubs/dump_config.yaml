@@ -16,9 +16,3 @@
 #        logs:
 #            limit: 500
 #            where: "created_at > NOW() - INTERVAL '30 days'"
-
-# Таблицы, исключённые из экспорта
-#exclude:
-#    public:
-#        - sessions
-#        - cache

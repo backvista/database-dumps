@@ -18,23 +18,15 @@ class DumpConfig
     private array $partialExport;
 
     /**
-     * @var array<string> Исключенные таблицы
-     */
-    private array $exclude;
-
-    /**
      * @param array<string, array<string>> $fullExport Полный экспорт по схемам
      * @param array<string, array<string, array<string, mixed>>> $partialExport Частичный экспорт с условиями
-     * @param array<string> $exclude Исключенные таблицы
      */
     public function __construct(
         array $fullExport,
-        array $partialExport,
-        array $exclude = []
+        array $partialExport
     ) {
         $this->fullExport = $fullExport;
         $this->partialExport = $partialExport;
-        $this->exclude = $exclude;
     }
 
     /**
@@ -75,14 +67,6 @@ class DumpConfig
     public function getAllPartialExportSchemas(): array
     {
         return array_keys($this->partialExport);
-    }
-
-    /**
-     * Проверить, исключена ли таблица
-     */
-    public function isExcluded(string $table): bool
-    {
-        return in_array($table, $this->exclude, true);
     }
 
     /**
