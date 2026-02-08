@@ -384,4 +384,4 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ## Credits
 
-Developed by Vista Ivanov (BackVista).
+Developed by Timur Bayan (BackVista).
