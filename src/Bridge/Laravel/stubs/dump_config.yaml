@@ -17,3 +17,16 @@
 #        logs:
 #            limit: 500
 #            where: "created_at > NOW() - INTERVAL '30 days'"
+
+# Дополнительные подключения (ключи = имена из config/database.php)
+#connections:
+#    mysql:
+#        full_export:
+#            app_db:
+#                - events
+#                - metrics
+#        partial_export:
+#            app_db:
+#                logs:
+#                    limit: 1000
+#                    order_by: "created_at DESC"

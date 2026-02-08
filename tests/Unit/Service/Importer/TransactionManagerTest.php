@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Importer;
 
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Service\Importer\TransactionManager;
 
@@ -16,7 +17,11 @@ class TransactionManagerTest extends TestCase
     protected function setUp(): void
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
-        $this->manager = new TransactionManager($this->connection);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+
+        $this->manager = new TransactionManager($registry);
     }
 
     public function testBeginStartsTransaction(): void

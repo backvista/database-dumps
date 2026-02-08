@@ -2,6 +2,7 @@
 
 namespace BackVista\DatabaseDumps\Service\Importer;
 
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 
 /**
@@ -9,40 +10,43 @@ use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
  */
 class TransactionManager
 {
-    private DatabaseConnectionInterface $connection;
+    private ConnectionRegistryInterface $registry;
 
-    public function __construct(DatabaseConnectionInterface $connection)
+    public function __construct(ConnectionRegistryInterface $registry)
     {
-        $this->connection = $connection;
+        $this->registry = $registry;
     }
 
     /**
-     * Начать транзакцию
+     * Начать транзакцию на указанном подключении
      */
-    public function begin(): void
+    public function begin(?string $connectionName = null): void
     {
-        if (!$this->connection->isTransactionActive()) {
-            $this->connection->beginTransaction();
+        $connection = $this->registry->getConnection($connectionName);
+        if (!$connection->isTransactionActive()) {
+            $connection->beginTransaction();
         }
     }
 
     /**
-     * Закоммитить транзакцию
+     * Закоммитить транзакцию на указанном подключении
      */
-    public function commit(): void
+    public function commit(?string $connectionName = null): void
     {
-        if ($this->connection->isTransactionActive()) {
-            $this->connection->commit();
+        $connection = $this->registry->getConnection($connectionName);
+        if ($connection->isTransactionActive()) {
+            $connection->commit();
         }
     }
 
     /**
-     * Откатить транзакцию
+     * Откатить транзакцию на указанном подключении
      */
-    public function rollBack(): void
+    public function rollBack(?string $connectionName = null): void
     {
-        if ($this->connection->isTransactionActive()) {
-            $this->connection->rollBack();
+        $connection = $this->registry->getConnection($connectionName);
+        if ($connection->isTransactionActive()) {
+            $connection->rollBack();
         }
     }
 
@@ -51,19 +55,20 @@ class TransactionManager
      *
      * @template T
      * @param callable(): T $callback
+     * @param string|null $connectionName
      * @return mixed
      * @throws \Throwable
      */
-    public function transaction(callable $callback)
+    public function transaction(callable $callback, ?string $connectionName = null)
     {
-        $this->begin();
+        $this->begin($connectionName);
 
         try {
             $result = $callback();
-            $this->commit();
+            $this->commit($connectionName);
             return $result;
         } catch (\Throwable $e) {
-            $this->rollBack();
+            $this->rollBack($connectionName);
             throw $e;
         }
     }

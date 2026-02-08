@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
@@ -26,9 +27,13 @@ class SqlGeneratorTest extends TestCase
 
         $platform = new PostgresPlatform();
 
-        $truncateGenerator = new TruncateGenerator($platform);
-        $insertGenerator = new InsertGenerator($connection, $platform);
-        $sequenceGenerator = new SequenceGenerator($connection, $platform);
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $truncateGenerator = new TruncateGenerator($registry);
+        $insertGenerator = new InsertGenerator($registry);
+        $sequenceGenerator = new SequenceGenerator($registry);
 
         $this->generator = new SqlGenerator(
             $truncateGenerator,

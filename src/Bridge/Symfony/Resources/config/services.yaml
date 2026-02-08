@@ -16,7 +16,7 @@ services:
     BackVista\DatabaseDumps\Contract\ConfigLoaderInterface:
         class: BackVista\DatabaseDumps\Util\YamlConfigLoader
 
-    # Platform
+    # Platform (для обратной совместимости)
     BackVista\DatabaseDumps\Contract\DatabasePlatformInterface:
         factory: ['BackVista\DatabaseDumps\Platform\PlatformFactory', 'create']
         arguments:
@@ -30,6 +30,15 @@ services:
         factory: ['@BackVista\DatabaseDumps\Contract\ConfigLoaderInterface', 'load']
         arguments:
             $path: '%kernel.project_dir%/config/dump_config.yaml'
+
+    # ConnectionRegistry
+    BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface:
+        class: BackVista\DatabaseDumps\Service\ConnectionRegistry
+        factory: ['BackVista\DatabaseDumps\Bridge\Symfony\ConnectionRegistryFactory', 'create']
+        arguments:
+            $defaultConnection: '@doctrine.dbal.default_connection'
+            $dumpConfig: '@BackVista\DatabaseDumps\Config\DumpConfig'
+            $container: '@service_container'
 
     # Services
     BackVista\DatabaseDumps\:

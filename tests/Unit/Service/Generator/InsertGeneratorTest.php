@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
@@ -23,7 +24,12 @@ class InsertGeneratorTest extends TestCase
         });
 
         $platform = new PostgresPlatform();
-        $this->generator = new InsertGenerator($this->connection, $platform);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $this->generator = new InsertGenerator($registry);
     }
 
     public function testGenerateWithEmptyRows(): void

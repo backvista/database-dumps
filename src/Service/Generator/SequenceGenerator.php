@@ -2,31 +2,29 @@
 
 namespace BackVista\DatabaseDumps\Service\Generator;
 
-use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
 /**
  * Генерация сброса sequences / auto-increment
  */
 class SequenceGenerator
 {
-    /** @var DatabaseConnectionInterface */
-    private $connection;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
 
-    /** @var DatabasePlatformInterface */
-    private $platform;
-
-    public function __construct(DatabaseConnectionInterface $connection, DatabasePlatformInterface $platform)
+    public function __construct(ConnectionRegistryInterface $registry)
     {
-        $this->connection = $connection;
-        $this->platform = $platform;
+        $this->registry = $registry;
     }
 
     /**
      * Сгенерировать statements для сброса sequences / auto-increment
      */
-    public function generate(string $schema, string $table): string
+    public function generate(string $schema, string $table, ?string $connectionName = null): string
     {
-        return $this->platform->getSequenceResetSql($schema, $table, $this->connection);
+        $connection = $this->registry->getConnection($connectionName);
+        $platform = $this->registry->getPlatform($connectionName);
+
+        return $platform->getSequenceResetSql($schema, $table, $connection);
     }
 }

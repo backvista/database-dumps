@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Generator\SequenceGenerator;
@@ -19,7 +20,12 @@ class SequenceGeneratorTest extends TestCase
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
         $platform = new PostgresPlatform();
-        $this->generator = new SequenceGenerator($this->connection, $platform);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $this->generator = new SequenceGenerator($registry);
     }
 
     public function testGenerateWithSequences(): void

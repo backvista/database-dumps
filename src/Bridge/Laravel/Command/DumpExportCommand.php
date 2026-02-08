@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 class DumpExportCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:export {table : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"}';
+    protected $signature = 'dbdump:export {table : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"} {--connection= : Имя подключения (или "all" для всех)}';
 
     /** @var string */
     protected $description = 'Экспорт SQL дампа таблицы из БД';
@@ -53,10 +53,12 @@ class DumpExportCommand extends Command
 
         /** @var string|null $schemaFilter */
         $schemaFilter = $this->option('schema');
+        /** @var string|null $connectionFilter */
+        $connectionFilter = $this->option('connection');
         $startTime = microtime(true);
 
         try {
-            $tables = $this->configResolver->resolveAll($schemaFilter);
+            $tables = $this->configResolver->resolveAll($schemaFilter, $connectionFilter);
 
             if (empty($tables)) {
                 $this->warn('Нет таблиц для экспорта в конфигурации');
@@ -88,6 +90,9 @@ class DumpExportCommand extends Command
             return self::FAILURE;
         }
 
+        /** @var string|null $connectionFilter */
+        $connectionFilter = $this->option('connection');
+
         /** @var array{0: string, 1: string} $parts */
         $parts = explode('.', $fullTableName, 2);
         $schema = $parts[0];
@@ -96,7 +101,7 @@ class DumpExportCommand extends Command
         $this->line("Экспорт: {$fullTableName}");
 
         try {
-            $config = $this->configResolver->resolve($schema, $table);
+            $config = $this->configResolver->resolve($schema, $table, $connectionFilter);
             $this->dumper->exportTable($config);
 
             return self::SUCCESS;

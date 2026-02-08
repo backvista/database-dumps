@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Generator\TruncateGenerator;
 
@@ -14,7 +15,11 @@ class TruncateGeneratorTest extends TestCase
     protected function setUp(): void
     {
         $platform = new PostgresPlatform();
-        $this->generator = new TruncateGenerator($platform);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $this->generator = new TruncateGenerator($registry);
     }
 
     public function testGenerate(): void

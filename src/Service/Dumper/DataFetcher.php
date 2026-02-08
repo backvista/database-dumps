@@ -3,24 +3,19 @@
 namespace BackVista\DatabaseDumps\Service\Dumper;
 
 use BackVista\DatabaseDumps\Config\TableConfig;
-use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
+use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
 /**
  * Загрузка данных из таблицы
  */
 class DataFetcher
 {
-    /** @var DatabaseConnectionInterface */
-    private $connection;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
 
-    /** @var DatabasePlatformInterface */
-    private $platform;
-
-    public function __construct(DatabaseConnectionInterface $connection, DatabasePlatformInterface $platform)
+    public function __construct(ConnectionRegistryInterface $registry)
     {
-        $this->connection = $connection;
-        $this->platform = $platform;
+        $this->registry = $registry;
     }
 
     /**
@@ -30,7 +25,11 @@ class DataFetcher
      */
     public function fetch(TableConfig $config): array
     {
-        $fullTable = $this->platform->getFullTableName($config->getSchema(), $config->getTable());
+        $connectionName = $config->getConnectionName();
+        $connection = $this->registry->getConnection($connectionName);
+        $platform = $this->registry->getPlatform($connectionName);
+
+        $fullTable = $platform->getFullTableName($config->getSchema(), $config->getTable());
         $sql = "SELECT * FROM {$fullTable}";
 
         if ($config->getWhere()) {
@@ -45,6 +44,6 @@ class DataFetcher
             $sql .= " LIMIT {$config->getLimit()}";
         }
 
-        return $this->connection->fetchAllAssociative($sql);
+        return $connection->fetchAllAssociative($sql);
     }
 }
