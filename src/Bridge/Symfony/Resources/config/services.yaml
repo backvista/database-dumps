@@ -1,0 +1,43 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    # Adapters
+    SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface:
+        class: SmartCrm\DatabaseDumps\Adapter\DoctrineDbalAdapter
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'
+
+    SmartCrm\DatabaseDumps\Contract\FileSystemInterface:
+        class: SmartCrm\DatabaseDumps\Util\FileSystemHelper
+
+    SmartCrm\DatabaseDumps\Contract\ConfigLoaderInterface:
+        class: SmartCrm\DatabaseDumps\Util\YamlConfigLoader
+
+    # Config
+    SmartCrm\DatabaseDumps\Config\EnvironmentConfig:
+        factory: ['SmartCrm\DatabaseDumps\Config\EnvironmentConfig', 'fromEnv']
+
+    SmartCrm\DatabaseDumps\Config\DumpConfig:
+        factory: ['@SmartCrm\DatabaseDumps\Contract\ConfigLoaderInterface', 'load']
+        arguments:
+            $path: '%kernel.project_dir%/config/dump_config.yaml'
+
+    # Services
+    SmartCrm\DatabaseDumps\:
+        resource: '../../../Service/**/*'
+
+    SmartCrm\DatabaseDumps\Service\Dumper\DatabaseDumper:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    SmartCrm\DatabaseDumps\Service\Importer\DatabaseImporter:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    # Commands
+    SmartCrm\DatabaseDumps\Bridge\Symfony\Command\:
+        resource: '../Command/*'
+        tags: ['console.command']

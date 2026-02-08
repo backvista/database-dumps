@@ -1,0 +1,61 @@
+{
+    "name": "backvista/database-dumps",
+    "description": "Framework-agnostic PHP package for managing database dumps with SQL exports/imports, supporting PostgreSQL, MySQL, and SQLite",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "database",
+        "dump",
+        "export",
+        "import",
+        "sql",
+        "postgresql",
+        "mysql",
+        "symfony",
+        "laravel"
+    ],
+    "authors": [
+        {
+            "name": "Vista Ivanov"
+        }
+    ],
+    "require": {
+        "php": "^7.4|^8.0",
+        "symfony/yaml": "^5.4|^6.0|^7.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5|^10.0|^11.0",
+        "symfony/console": "^5.4|^6.0|^7.0",
+        "doctrine/dbal": "^2.13|^3.0|^4.0",
+        "symfony/finder": "^5.4|^6.0|^7.0",
+        "phpstan/phpstan": "^1.10",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "backvista\\DatabaseDumps\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "backvista\\DatabaseDumps\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test-coverage": "phpunit --coverage-html coverage",
+        "phpstan": "phpstan analyse src tests --level=8",
+        "cs-fix": "php-cs-fixer fix"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.0-dev"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
