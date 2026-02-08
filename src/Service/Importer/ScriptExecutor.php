@@ -59,28 +59,36 @@ class ScriptExecutor
         // Сортировка для предсказуемого порядка выполнения
         sort($files);
 
+        $total = count($files);
+        $current = 0;
+
         foreach ($files as $file) {
-            $this->executeScript($connection, $file);
+            $current++;
+            $this->executeScript($connection, $file, $current, $total);
         }
     }
 
     /**
      * Выполнить один SQL скрипт
      */
-    private function executeScript(DatabaseConnectionInterface $connection, string $filePath): void
+    private function executeScript(DatabaseConnectionInterface $connection, string $filePath, int $current, int $total): void
     {
         $filename = basename($filePath);
-        $this->logger->info("Выполнение: {$filename}");
 
-        $sql = $this->fileSystem->read($filePath);
-        $statements = $this->parser->parseFile($sql);
+        try {
+            $sql = $this->fileSystem->read($filePath);
+            $statements = $this->parser->parseFile($sql);
 
-        foreach ($statements as $statement) {
-            if (!empty(trim($statement))) {
-                $connection->executeStatement($statement);
+            foreach ($statements as $statement) {
+                if (!empty(trim($statement))) {
+                    $connection->executeStatement($statement);
+                }
             }
-        }
 
-        $this->logger->info("  ✓ Успешно");
+            $this->logger->info("[{$current}/{$total}] {$filename} ... OK");
+        } catch (\Exception $e) {
+            $this->logger->error("[{$current}/{$total}] {$filename} ... ERROR: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
