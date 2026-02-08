@@ -30,7 +30,7 @@ class DumpExportCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('app:dump:export')
+            ->setName('app:dbdump:export')
             ->setDescription('Экспорт SQL дампа таблицы из БД (schema.table или "all")')
             ->addArgument('table', InputArgument::REQUIRED, 'Имя таблицы (schema.table) или "all" для всех таблиц')
             ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Фильтр по схеме для "all"');

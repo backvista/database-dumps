@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 class DumpExportCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dump:export {table : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"}';
+    protected $signature = 'dbdump:export {table : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"}';
 
     /** @var string */
     protected $description = 'Экспорт SQL дампа таблицы из БД';

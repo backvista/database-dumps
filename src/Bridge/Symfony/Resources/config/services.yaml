@@ -47,3 +47,7 @@ services:
     BackVista\DatabaseDumps\Bridge\Symfony\Command\:
         resource: '../Command/*'
         tags: ['console.command']
+
+    BackVista\DatabaseDumps\Bridge\Symfony\Command\PrepareConfigCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'

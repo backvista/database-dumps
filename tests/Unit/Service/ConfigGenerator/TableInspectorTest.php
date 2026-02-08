@@ -1,0 +1,200 @@
+<?php
+
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\ConfigGenerator;
+
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\TableInspector;
+use PHPUnit\Framework\TestCase;
+
+class TableInspectorTest extends TestCase
+{
+    /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $connection;
+
+    protected function setUp(): void
+    {
+        $this->connection = $this->createMock(DatabaseConnectionInterface::class);
+    }
+
+    public function testListTablesPostgresql(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('information_schema.tables'),
+                $this->stringContains("'pg_catalog'"),
+                $this->stringContains("'information_schema'")
+            ))
+            ->willReturn([
+                ['table_schema' => 'public', 'table_name' => 'users'],
+                ['table_schema' => 'public', 'table_name' => 'orders'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $tables = $inspector->listTables();
+
+        $this->assertCount(2, $tables);
+        $this->assertEquals('users', $tables[0]['table_name']);
+        $this->assertEquals('orders', $tables[1]['table_name']);
+    }
+
+    public function testListTablesMysql(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('mysql');
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('information_schema.tables'),
+                $this->stringContains("'mysql'"),
+                $this->stringContains("'performance_schema'"),
+                $this->stringContains("'sys'")
+            ))
+            ->willReturn([
+                ['table_schema' => 'mydb', 'table_name' => 'products'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $tables = $inspector->listTables();
+
+        $this->assertCount(1, $tables);
+        $this->assertEquals('products', $tables[0]['table_name']);
+    }
+
+    public function testCountRows(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->stringContains('COUNT(*)'))
+            ->willReturn([['cnt' => 42]]);
+
+        $inspector = new TableInspector($this->connection);
+        $count = $inspector->countRows('public', 'users');
+
+        $this->assertEquals(42, $count);
+    }
+
+    public function testCountRowsMysql(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('mysql');
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->stringContains('`public`.`users`'))
+            ->willReturn([['cnt' => 100]]);
+
+        $inspector = new TableInspector($this->connection);
+        $count = $inspector->countRows('public', 'users');
+
+        $this->assertEquals(100, $count);
+    }
+
+    public function testDetectOrderColumnUpdatedAt(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['column_name' => 'id'],
+                ['column_name' => 'name'],
+                ['column_name' => 'created_at'],
+                ['column_name' => 'updated_at'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $orderColumn = $inspector->detectOrderColumn('public', 'users');
+
+        $this->assertEquals('updated_at DESC', $orderColumn);
+    }
+
+    public function testDetectOrderColumnCreatedAt(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['column_name' => 'id'],
+                ['column_name' => 'name'],
+                ['column_name' => 'created_at'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $orderColumn = $inspector->detectOrderColumn('public', 'users');
+
+        $this->assertEquals('created_at DESC', $orderColumn);
+    }
+
+    public function testDetectOrderColumnId(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['column_name' => 'id'],
+                ['column_name' => 'name'],
+                ['column_name' => 'email'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $orderColumn = $inspector->detectOrderColumn('public', 'users');
+
+        $this->assertEquals('id DESC', $orderColumn);
+    }
+
+    public function testDetectOrderColumnFallbackToFirstColumn(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['column_name' => 'uuid'],
+                ['column_name' => 'name'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $orderColumn = $inspector->detectOrderColumn('public', 'custom_table');
+
+        $this->assertEquals('uuid DESC', $orderColumn);
+    }
+
+    public function testDetectOrderColumnUpdateAt(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn('postgresql');
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['column_name' => 'id'],
+                ['column_name' => 'update_at'],
+                ['column_name' => 'create_at'],
+            ]);
+
+        $inspector = new TableInspector($this->connection);
+        $orderColumn = $inspector->detectOrderColumn('public', 'users');
+
+        $this->assertEquals('update_at DESC', $orderColumn);
+    }
+}

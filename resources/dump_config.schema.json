@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Database Dumps Configuration",
+  "description": "Конфигурация экспорта дампов БД (backvista/database-dumps)",
+  "type": "object",
+  "properties": {
+    "full_export": {
+      "description": "Полный экспорт таблиц (все строки). Ключ — имя схемы, значение — список таблиц.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "description": "Имя таблицы"
+        },
+        "description": "Список таблиц для полного экспорта"
+      }
+    },
+    "partial_export": {
+      "description": "Частичный экспорт таблиц (с ограничениями). Ключ — имя схемы.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "description": "Таблицы схемы с настройками экспорта",
+        "additionalProperties": {
+          "type": "object",
+          "description": "Настройки экспорта таблицы",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Максимальное количество строк для экспорта"
+            },
+            "order_by": {
+              "type": "string",
+              "pattern": "(ASC|DESC)$",
+              "description": "SQL ORDER BY (должен заканчиваться на ASC или DESC). Пример: \"created_at DESC\""
+            },
+            "where": {
+              "type": "string",
+              "description": "SQL WHERE условие. Пример: \"is_active = true\""
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

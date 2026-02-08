@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../vendor/backvista/database-dumps/resources/dump_config.schema.json
 # Конфигурация экспорта дампов БД
 # Документация: https://github.com/backvista/database-dumps
 

@@ -22,7 +22,7 @@ class DbInitCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('app:db:init')
+            ->setName('app:dbdump:import')
             ->setDescription('Инициализация БД с импортом SQL дампов')
             ->addOption('skip-before', null, InputOption::VALUE_NONE, 'Пропустить before_exec скрипты')
             ->addOption('skip-after', null, InputOption::VALUE_NONE, 'Пропустить after_exec скрипты')

@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class DbInitCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dump:init {--skip-before : Пропустить before_exec скрипты} {--skip-after : Пропустить after_exec скрипты} {--schema= : Импорт только указанной схемы}';
+    protected $signature = 'dbdump:import {--skip-before : Пропустить before_exec скрипты} {--skip-after : Пропустить after_exec скрипты} {--schema= : Импорт только указанной схемы}';
 
     /** @var string */
     protected $description = 'Инициализация БД с импортом SQL дампов';

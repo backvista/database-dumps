@@ -5,6 +5,7 @@ namespace BackVista\DatabaseDumps\Bridge\Laravel;
 use BackVista\DatabaseDumps\Adapter\LaravelDatabaseAdapter;
 use BackVista\DatabaseDumps\Bridge\Laravel\Command\DbInitCommand;
 use BackVista\DatabaseDumps\Bridge\Laravel\Command\DumpExportCommand;
+use BackVista\DatabaseDumps\Bridge\Laravel\Command\PrepareConfigCommand;
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\EnvironmentConfig;
 use BackVista\DatabaseDumps\Contract\ConfigLoaderInterface;
@@ -13,6 +14,9 @@ use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Platform\PlatformFactory;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigGenerator;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\ServiceTableFilter;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\TableInspector;
 use BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
 use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
@@ -90,6 +94,18 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
 
         $this->app->singleton(DataFetcher::class);
 
+        $this->app->singleton(ServiceTableFilter::class);
+        $this->app->singleton(TableInspector::class);
+        $this->app->singleton(ConfigGenerator::class);
+
+        $this->app->singleton(PrepareConfigCommand::class, function ($app) {
+            return new PrepareConfigCommand(
+                $app->make(ConfigGenerator::class),
+                $app->make(LoggerInterface::class),
+                $app['config']->get('database-dumps.config_path')
+            );
+        });
+
         $this->app->singleton(DatabaseDumper::class, function ($app) {
             return new DatabaseDumper(
                 $app->make(DataFetcher::class),
@@ -126,6 +142,7 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
             $this->commands([
                 DumpExportCommand::class,
                 DbInitCommand::class,
+                PrepareConfigCommand::class,
             ]);
         }
     }

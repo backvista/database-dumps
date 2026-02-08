@@ -48,13 +48,13 @@ partial_export:
 3. Export dumps:
 
 ```bash
-php bin/console app:dump:export all
+php bin/console app:dbdump:export all
 ```
 
 4. Import dumps:
 
 ```bash
-php bin/console app:db:init
+php bin/console app:dbdump:import
 ```
 
 ### Laravel Integration
@@ -73,13 +73,13 @@ php bin/console app:db:init
 3. Export dumps:
 
 ```bash
-php artisan dump:export all
+php artisan dbdump:export all
 ```
 
 4. Import dumps:
 
 ```bash
-php artisan dump:init
+php artisan dbdump:import
 ```
 
 ## Architecture
@@ -101,6 +101,27 @@ The package uses `DatabasePlatformInterface` to generate SQL compatible with eac
 - **MySqlPlatform**: Backticks for identifiers, `FOREIGN_KEY_CHECKS` around TRUNCATE, `AUTO_INCREMENT` reset
 
 Platform is automatically detected from the database connection.
+
+## IDE Support (JSON Schema)
+
+The package includes a JSON Schema for `dump_config.yaml` at `resources/dump_config.schema.json`. This provides autocompletion, validation, and documentation hints in PHPStorm and other IDEs.
+
+### Option 1: YAML comment (recommended)
+
+Add this line at the top of your `dump_config.yaml`:
+
+```yaml
+# yaml-language-server: $schema=../vendor/backvista/database-dumps/resources/dump_config.schema.json
+```
+
+> For Symfony projects use the path `../vendor/backvista/database-dumps/resources/dump_config.schema.json`, for Laravel — adjust relative to your `database/` directory.
+
+### Option 2: PHPStorm manual mapping
+
+1. Open **Settings > Languages & Frameworks > Schemas and DTOs > JSON Schema Mappings**
+2. Add a new mapping:
+   - **Schema file**: `vendor/backvista/database-dumps/resources/dump_config.schema.json`
+   - **File path pattern**: `dump_config.yaml`
 
 ## Configuration
 
@@ -175,20 +196,20 @@ parameters:
 
 ```bash
 # Export all tables from config
-php bin/console app:dump:export all
+php bin/console app:dbdump:export all
 
 # Export specific table
-php bin/console app:dump:export public.users
+php bin/console app:dbdump:export public.users
 
 # Export with schema filter
-php bin/console app:dump:export all --schema=public
+php bin/console app:dbdump:export all --schema=public
 
 # Import all dumps
-php bin/console app:db:init
+php bin/console app:dbdump:import
 
 # Import with options
-php bin/console app:db:init --skip-before --skip-after
-php bin/console app:db:init --schema=public
+php bin/console app:dbdump:import --skip-before --skip-after
+php bin/console app:dbdump:import --schema=public
 ```
 
 ### Laravel Configuration
@@ -216,20 +237,20 @@ return [
 
 ```bash
 # Export all tables
-php artisan dump:export all
+php artisan dbdump:export all
 
 # Export specific table
-php artisan dump:export public.users
+php artisan dbdump:export public.users
 
 # Export with schema filter
-php artisan dump:export all --schema=public
+php artisan dbdump:export all --schema=public
 
 # Import dumps
-php artisan dump:init
+php artisan dbdump:import
 
 # Import with options
-php artisan dump:init --skip-before --skip-after
-php artisan dump:init --schema=public
+php artisan dbdump:import --skip-before --skip-after
+php artisan dbdump:import --schema=public
 ```
 
 ### Configuration Options
@@ -288,17 +309,17 @@ Scripts are executed in **alphabetical order**. Use numeric prefixes (01_, 02_) 
 Symfony:
 
 ```bash
-php bin/console app:db:init --skip-before
-php bin/console app:db:init --skip-after
-php bin/console app:db:init --skip-before --skip-after
+php bin/console app:dbdump:import --skip-before
+php bin/console app:dbdump:import --skip-after
+php bin/console app:dbdump:import --skip-before --skip-after
 ```
 
 Laravel:
 
 ```bash
-php artisan dump:init --skip-before
-php artisan dump:init --skip-after
-php artisan dump:init --skip-before --skip-after
+php artisan dbdump:import --skip-before
+php artisan dbdump:import --skip-after
+php artisan dbdump:import --skip-before --skip-after
 ```
 
 ## Testing
