@@ -1,0 +1,24 @@
+# Конфигурация экспорта дампов БД
+# Документация: https://github.com/backvista/database-dumps
+
+# Полный экспорт таблиц (все строки)
+#full_export:
+#    public:
+#        - users
+#        - roles
+
+# Частичный экспорт таблиц (с ограничениями)
+#partial_export:
+#    public:
+#        orders:
+#            limit: 1000
+#            order_by: "id DESC"
+#        logs:
+#            limit: 500
+#            where: "created_at > NOW() - INTERVAL '30 days'"
+
+# Таблицы, исключённые из экспорта
+#exclude:
+#    public:
+#        - sessions
+#        - cache

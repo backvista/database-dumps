@@ -64,6 +64,11 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
 
         $this->app->singleton(DumpConfig::class, function ($app) {
             $configPath = $app['config']->get('database-dumps.config_path');
+
+            if (!file_exists($configPath)) {
+                return new DumpConfig([], [], []);
+            }
+
             /** @var ConfigLoaderInterface $loader */
             $loader = $app->make(ConfigLoaderInterface::class);
 
@@ -115,11 +120,30 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
             __DIR__ . '/config/database-dumps.php' => config_path('database-dumps.php'),
         ], 'database-dumps-config');
 
+        $this->ensureDumpConfigExists();
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 DumpExportCommand::class,
                 DbInitCommand::class,
             ]);
         }
+    }
+
+    private function ensureDumpConfigExists(): void
+    {
+        /** @var string $configPath */
+        $configPath = $this->app['config']->get('database-dumps.config_path');
+
+        if (file_exists($configPath)) {
+            return;
+        }
+
+        $dir = dirname($configPath);
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        copy(__DIR__ . '/stubs/dump_config.yaml', $configPath);
     }
 }
