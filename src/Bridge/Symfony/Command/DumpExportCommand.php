@@ -30,9 +30,18 @@ class DumpExportCommand extends Command
         $this
             ->setName('app:dbdump:export')
             ->setDescription('Экспорт SQL дампа таблицы из БД (schema.table или "all")')
-            ->addArgument('table', InputArgument::REQUIRED, 'Имя таблицы (schema.table) или "all" для всех таблиц')
+            ->addArgument('table', InputArgument::OPTIONAL, 'Имя таблицы (schema.table) или "all" для всех таблиц')
             ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Фильтр по схеме для "all"')
-            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)');
+            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)')
+            ->setHelp(<<<'HELP'
+Примеры:
+  php bin/console app:dbdump:export public.users              Экспорт таблицы users из схемы public
+  php bin/console app:dbdump:export all                       Экспорт всех настроенных таблиц
+  php bin/console app:dbdump:export all --schema=public       Экспорт таблиц схемы public
+  php bin/console app:dbdump:export all --connection=secondary Экспорт из подключения secondary
+  php bin/console app:dbdump:export all --connection=all      Экспорт из всех подключений
+HELP
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -40,11 +49,36 @@ class DumpExportCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $table = $input->getArgument('table');
 
+        if ($table === null) {
+            $this->showUsage($io);
+            return Command::SUCCESS;
+        }
+
         if ($table === 'all') {
             return $this->exportAll($input, $io);
         }
 
         return $this->exportTable($input, $table, $io);
+    }
+
+    private function showUsage(SymfonyStyle $io): void
+    {
+        $io->text([
+            '<info>Использование:</info>',
+            '  export <comment><schema.table></comment>    Экспорт одной таблицы',
+            '  export <comment>all</comment>               Экспорт всех таблиц из конфигурации',
+            '',
+            '<info>Примеры:</info>',
+            '  export <comment>public.users</comment>              — Экспорт таблицы users из схемы public',
+            '  export <comment>all</comment>                       — Экспорт всех настроенных таблиц',
+            '  export <comment>all --schema=public</comment>       — Экспорт таблиц схемы public',
+            '  export <comment>all --connection=secondary</comment> — Экспорт из подключения secondary',
+            '',
+            '<info>Опции:</info>',
+            '  <comment>-s, --schema=SCHEMA</comment>           Фильтр по схеме (для "all")',
+            '  <comment>-c, --connection=CONNECTION</comment>   Имя подключения (или "all" для всех)',
+            '  <comment>-h, --help</comment>                    Вывод справки',
+        ]);
     }
 
     private function exportAll(InputInterface $input, SymfonyStyle $io): int

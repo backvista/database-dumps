@@ -56,7 +56,10 @@
         "test": "phpunit",
         "test-coverage": "phpunit --coverage-html coverage",
         "phpstan": "phpstan analyse --memory-limit=512M",
-        "cs-fix": "php-cs-fixer fix"
+        "cs-fix": "php-cs-fixer fix",
+        "setup-hooks": "git config core.hooksPath .githooks",
+        "post-install-cmd": ["@setup-hooks"],
+        "post-update-cmd": ["@setup-hooks"]
     },
     "extra": {
         "branch-alias": {

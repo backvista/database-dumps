@@ -30,7 +30,18 @@ class PrepareConfigCommand extends Command
             ->setName('app:dbdump:prepare-config')
             ->setDescription('Автоматическая генерация dump_config.yaml на основе структуры БД')
             ->addOption('threshold', 't', InputOption::VALUE_REQUIRED, 'Порог строк для partial_export', '500')
-            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Перезаписать без подтверждения');
+            ->addOption('force', 'f', InputOption::VALUE_NONE, 'Перезаписать без подтверждения')
+            ->setHelp(<<<'HELP'
+Анализирует структуру БД и генерирует dump_config.yaml.
+Таблицы с количеством строк <= threshold попадают в full_export,
+остальные — в partial_export с лимитом.
+
+Примеры:
+  php bin/console app:dbdump:prepare-config                  Генерация с порогом по умолчанию (500 строк)
+  php bin/console app:dbdump:prepare-config --threshold=1000 Установить порог 1000 строк
+  php bin/console app:dbdump:prepare-config --force          Перезаписать без подтверждения
+HELP
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
