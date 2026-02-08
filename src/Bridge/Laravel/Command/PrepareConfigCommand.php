@@ -15,6 +15,18 @@ class PrepareConfigCommand extends Command
     /** @var string */
     protected $description = 'Автоматическая генерация dump_config.yaml на основе структуры БД';
 
+    /** @var string */
+    protected $help = <<<'HELP'
+Анализирует структуру БД и генерирует dump_config.yaml.
+Таблицы с количеством строк <= threshold попадают в full_export,
+остальные — в partial_export с лимитом.
+
+Примеры:
+  php artisan dbdump:prepare-config                  Генерация с порогом по умолчанию (500 строк)
+  php artisan dbdump:prepare-config --threshold=1000 Установить порог 1000 строк
+  php artisan dbdump:prepare-config --force          Перезаписать без подтверждения
+HELP;
+
     /** @var ConfigGenerator */
     private $generator;
 

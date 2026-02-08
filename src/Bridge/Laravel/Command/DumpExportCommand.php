@@ -11,10 +11,20 @@ use Illuminate\Console\Command;
 class DumpExportCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:export {table : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"} {--connection= : Имя подключения (или "all" для всех)}';
+    protected $signature = 'dbdump:export {table? : Имя таблицы (schema.table) или "all"} {--schema= : Фильтр по схеме для "all"} {--connection= : Имя подключения (или "all" для всех)}';
 
     /** @var string */
     protected $description = 'Экспорт SQL дампа таблицы из БД';
+
+    /** @var string */
+    protected $help = <<<'HELP'
+Примеры:
+  php artisan dbdump:export public.users              Экспорт таблицы users из схемы public
+  php artisan dbdump:export all                       Экспорт всех настроенных таблиц
+  php artisan dbdump:export all --schema=public       Экспорт таблиц схемы public
+  php artisan dbdump:export all --connection=secondary Экспорт из подключения secondary
+  php artisan dbdump:export all --connection=all      Экспорт из всех подключений
+HELP;
 
     /** @var DatabaseDumper */
     private $dumper;
@@ -37,14 +47,38 @@ class DumpExportCommand extends Command
     {
         $this->setupLogger();
 
-        /** @var string $table */
+        /** @var string|null $table */
         $table = $this->argument('table');
+
+        if ($table === null) {
+            $this->showUsage();
+            return self::SUCCESS;
+        }
 
         if ($table === 'all') {
             return $this->exportAll();
         }
 
         return $this->exportTable($table);
+    }
+
+    private function showUsage(): void
+    {
+        $this->line('');
+        $this->line('<info>Использование:</info>');
+        $this->line('  export <comment><schema.table></comment>    Экспорт одной таблицы');
+        $this->line('  export <comment>all</comment>               Экспорт всех таблиц из конфигурации');
+        $this->line('');
+        $this->line('<info>Примеры:</info>');
+        $this->line('  export <comment>public.users</comment>              — Экспорт таблицы users из схемы public');
+        $this->line('  export <comment>all</comment>                       — Экспорт всех настроенных таблиц');
+        $this->line('  export <comment>all --schema=public</comment>       — Экспорт таблиц схемы public');
+        $this->line('  export <comment>all --connection=secondary</comment> — Экспорт из подключения secondary');
+        $this->line('');
+        $this->line('<info>Опции:</info>');
+        $this->line('  <comment>-s, --schema=SCHEMA</comment>           Фильтр по схеме (для "all")');
+        $this->line('  <comment>-c, --connection=CONNECTION</comment>   Имя подключения (или "all" для всех)');
+        $this->line('  <comment>-h, --help</comment>                    Вывод справки');
     }
 
     private function exportAll(): int

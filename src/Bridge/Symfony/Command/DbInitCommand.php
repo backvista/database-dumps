@@ -27,7 +27,20 @@ class DbInitCommand extends Command
             ->addOption('skip-before', null, InputOption::VALUE_NONE, 'Пропустить before_exec скрипты')
             ->addOption('skip-after', null, InputOption::VALUE_NONE, 'Пропустить after_exec скрипты')
             ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Импорт только указанной схемы')
-            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)');
+            ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)')
+            ->setHelp(<<<'HELP'
+Примеры:
+  php bin/console app:dbdump:import                          Импорт всех дампов
+  php bin/console app:dbdump:import --schema=public          Импорт только схемы public
+  php bin/console app:dbdump:import --skip-before            Пропустить before_exec скрипты
+  php bin/console app:dbdump:import --skip-after             Пропустить after_exec скрипты
+  php bin/console app:dbdump:import --connection=secondary   Импорт из подключения secondary
+
+Скрипты:
+  database/before_exec/*.sql      Выполняются до импорта (по алфавиту)
+  database/after_exec/*.sql       Выполняются после импорта (по алфавиту)
+HELP
+            );
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

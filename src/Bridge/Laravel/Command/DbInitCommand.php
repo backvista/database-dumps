@@ -15,6 +15,20 @@ class DbInitCommand extends Command
     /** @var string */
     protected $description = 'Инициализация БД с импортом SQL дампов';
 
+    /** @var string */
+    protected $help = <<<'HELP'
+Примеры:
+  php artisan dbdump:import                          Импорт всех дампов
+  php artisan dbdump:import --schema=public          Импорт только схемы public
+  php artisan dbdump:import --skip-before            Пропустить before_exec скрипты
+  php artisan dbdump:import --skip-after             Пропустить after_exec скрипты
+  php artisan dbdump:import --connection=secondary   Импорт из подключения secondary
+
+Скрипты:
+  database/before_exec/*.sql      Выполняются до импорта (по алфавиту)
+  database/after_exec/*.sql       Выполняются после импорта (по алфавиту)
+HELP;
+
     /** @var DatabaseImporter */
     private $importer;
 
