@@ -59,7 +59,7 @@ php bin/console app:db:init
 
 ### Laravel Integration
 
-1. The service provider is auto-discovered. If not, register manually in `config/app.php`:
+1. The service provider is auto-discovered. The file `database/dump_config.yaml` is created automatically on first run. If not auto-discovered, register manually in `config/app.php`:
 
 ```php
 'providers' => [
@@ -68,21 +68,15 @@ php bin/console app:db:init
 ],
 ```
 
-2. Publish configuration:
+2. Edit `database/dump_config.yaml` (same format as Symfony).
 
-```bash
-php artisan vendor:publish --tag=database-dumps-config
-```
-
-3. Create `config/dump_config.yaml` (same format as Symfony).
-
-4. Export dumps:
+3. Export dumps:
 
 ```bash
 php artisan dump:export all
 ```
 
-5. Import dumps:
+4. Import dumps:
 
 ```bash
 php artisan dump:init
@@ -137,10 +131,6 @@ partial_export:
     orders:
       limit: 5000
       order_by: created_at DESC
-
-exclude:
-  - temp_table
-  - cache_table
 ```
 
 #### 2. Directory Structure
@@ -203,7 +193,11 @@ php bin/console app:db:init --schema=public
 
 ### Laravel Configuration
 
-#### 1. Publish Configuration
+#### 1. Configuration
+
+The file `database/dump_config.yaml` is created automatically on first run. Edit it with your export rules (same format as Symfony).
+
+To customize the config path or project directory, publish the PHP config:
 
 ```bash
 php artisan vendor:publish --tag=database-dumps-config
@@ -213,16 +207,12 @@ This creates `config/database-dumps.php`:
 
 ```php
 return [
-    'config_path' => base_path('config/dump_config.yaml'),
+    'config_path' => base_path('database/dump_config.yaml'),
     'project_dir' => base_path(),
 ];
 ```
 
-#### 2. Create YAML Configuration
-
-Create `config/dump_config.yaml` (same format as Symfony).
-
-#### 3. Usage
+#### 2. Usage
 
 ```bash
 # Export all tables
@@ -278,16 +268,6 @@ partial_export:
 - `limit` - Maximum number of rows to export
 - `order_by` - SQL ORDER BY clause
 - `where` - SQL WHERE condition
-
-#### Exclude Tables
-
-Prevent certain tables from being exported:
-
-```yaml
-exclude:
-  - temp_data
-  - cache_entries
-```
 
 ### Before/After Execution Scripts
 
