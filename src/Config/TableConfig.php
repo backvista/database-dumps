@@ -9,6 +9,7 @@ class TableConfig
 {
     public const KEY_LIMIT = 'limit';
     public const KEY_WHERE = 'where';
+
     public const KEY_ORDER_BY = 'order_by';
 
     private string $schema;
