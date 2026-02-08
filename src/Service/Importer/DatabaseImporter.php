@@ -151,11 +151,36 @@ class DatabaseImporter
         // Сортировка для предсказуемого порядка
         sort($files);
 
+        // Фильтрация по схеме для подсчёта
+        $filteredFiles = $this->filterFilesBySchema($files, $schemaFilter);
+        $total = count($filteredFiles);
+        $current = 0;
+
         $connection = $this->registry->getConnection($connectionName);
 
-        foreach ($files as $file) {
-            $this->importDumpFile($file, $schemaFilter, $connection);
+        foreach ($filteredFiles as $file) {
+            $current++;
+            $this->importDumpFile($file, $current, $total, $connection);
         }
+    }
+
+    /**
+     * Фильтрация файлов по схеме
+     *
+     * @param string[] $files
+     * @return string[]
+     */
+    private function filterFilesBySchema(array $files, ?string $schemaFilter): array
+    {
+        if ($schemaFilter === null) {
+            return $files;
+        }
+
+        return array_values(array_filter($files, function (string $filePath) use ($schemaFilter) {
+            $pathParts = explode(DIRECTORY_SEPARATOR, $filePath);
+            $schema = $pathParts[count($pathParts) - 2] ?? '';
+            return $schema === $schemaFilter;
+        }));
     }
 
     /**
@@ -175,30 +200,30 @@ class DatabaseImporter
      *
      * @param \BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface $connection
      */
-    private function importDumpFile(string $filePath, ?string $schemaFilter, $connection): void
+    private function importDumpFile(string $filePath, int $current, int $total, $connection): void
     {
         // Извлечение schema из пути: database/dumps/{schema}/{table}.sql
         $pathParts = explode(DIRECTORY_SEPARATOR, $filePath);
         $schema = $pathParts[count($pathParts) - 2] ?? '';
         $tableName = basename($filePath, '.sql');
 
-        // Фильтрация по схеме если указано
-        if ($schemaFilter && $schema !== $schemaFilter) {
-            return;
-        }
-
         $fullName = "{$schema}.{$tableName}";
-        $this->logger->info("Импорт: {$fullName}");
+        $this->logger->info("[{$current}/{$total}] {$fullName} ... ");
 
-        $sql = $this->fileSystem->read($filePath);
-        $statements = $this->parser->parseFile($sql);
+        try {
+            $sql = $this->fileSystem->read($filePath);
+            $statements = $this->parser->parseFile($sql);
 
-        foreach ($statements as $statement) {
-            if (!empty(trim($statement))) {
-                $connection->executeStatement($statement);
+            foreach ($statements as $statement) {
+                if (!empty(trim($statement))) {
+                    $connection->executeStatement($statement);
+                }
             }
-        }
 
-        $this->logger->info("  ✓ Успешно");
+            $this->logger->info("[{$current}/{$total}] {$fullName} ... OK");
+        } catch (\Exception $e) {
+            $this->logger->error("[{$current}/{$total}] {$fullName} ... ERROR: " . $e->getMessage());
+            throw $e;
+        }
     }
 }
