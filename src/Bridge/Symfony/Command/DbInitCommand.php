@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Bridge\Symfony\Command;
+namespace BackVista\DatabaseDumps\Bridge\Symfony\Command;
 
-use SmartCrm\DatabaseDumps\Service\Importer\DatabaseImporter;
+use BackVista\DatabaseDumps\Service\Importer\DatabaseImporter;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -52,7 +52,7 @@ class DbInitCommand extends Command
             $io->error('Ошибка импорта: ' . $e->getMessage());
             $io->warning('Все изменения отменены (rollback)');
 
-            if ($output->isVerbose()) {
+            if ($io->isVerbose()) {
                 $io->note('Трейс: ' . $e->getTraceAsString());
             }
 

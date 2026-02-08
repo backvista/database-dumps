@@ -1,14 +1,16 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Importer;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Importer;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Service\Importer\TransactionManager;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Service\Importer\TransactionManager;
 
 class TransactionManagerTest extends TestCase
 {
-    private DatabaseConnectionInterface $connection;
+    /** @var MockObject&DatabaseConnectionInterface */
+    private $connection;
     private TransactionManager $manager;
 
     protected function setUp(): void

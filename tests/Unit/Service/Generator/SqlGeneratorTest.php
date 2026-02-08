@@ -1,28 +1,34 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Generator;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\TableConfig;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Service\Generator\InsertGenerator;
-use SmartCrm\DatabaseDumps\Service\Generator\SequenceGenerator;
-use SmartCrm\DatabaseDumps\Service\Generator\SqlGenerator;
-use SmartCrm\DatabaseDumps\Service\Generator\TruncateGenerator;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
+use BackVista\DatabaseDumps\Service\Generator\SequenceGenerator;
+use BackVista\DatabaseDumps\Service\Generator\SqlGenerator;
+use BackVista\DatabaseDumps\Service\Generator\TruncateGenerator;
 
 class SqlGeneratorTest extends TestCase
 {
-    private SqlGenerator $generator;
+    /** @var SqlGenerator */
+    private $generator;
 
     protected function setUp(): void
     {
         $connection = $this->createMock(DatabaseConnectionInterface::class);
-        $connection->method('quote')->willReturnCallback(fn($value) => "'{$value}'");
+        $connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
         $connection->method('fetchFirstColumn')->willReturn([]);
 
-        $truncateGenerator = new TruncateGenerator();
-        $insertGenerator = new InsertGenerator($connection);
-        $sequenceGenerator = new SequenceGenerator($connection);
+        $platform = new PostgresPlatform();
+
+        $truncateGenerator = new TruncateGenerator($platform);
+        $insertGenerator = new InsertGenerator($connection, $platform);
+        $sequenceGenerator = new SequenceGenerator($connection, $platform);
 
         $this->generator = new SqlGenerator(
             $truncateGenerator,
@@ -51,7 +57,7 @@ class SqlGeneratorTest extends TestCase
 
     public function testGeneratePartialExport(): void
     {
-        $config = new TableConfig('clients', 'clients', limit: 100);
+        $config = new TableConfig('clients', 'clients', 100);
         $rows = [
             ['id' => 1, 'name' => 'Client 1']
         ];

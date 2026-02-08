@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Parser;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Parser;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Service\Parser\SqlParser;
-use SmartCrm\DatabaseDumps\Service\Parser\StatementSplitter;
+use BackVista\DatabaseDumps\Service\Parser\SqlParser;
+use BackVista\DatabaseDumps\Service\Parser\StatementSplitter;
 
 class SqlParserTest extends TestCase
 {

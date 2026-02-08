@@ -1,13 +1,13 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Importer;
+namespace BackVista\DatabaseDumps\Service\Importer;
 
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Contract\FileSystemInterface;
-use SmartCrm\DatabaseDumps\Contract\LoggerInterface;
-use SmartCrm\DatabaseDumps\Exception\ImportFailedException;
-use SmartCrm\DatabaseDumps\Service\Parser\SqlParser;
-use SmartCrm\DatabaseDumps\Service\Security\ProductionGuard;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\FileSystemInterface;
+use BackVista\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Exception\ImportFailedException;
+use BackVista\DatabaseDumps\Service\Parser\SqlParser;
+use BackVista\DatabaseDumps\Service\Security\ProductionGuard;
 
 /**
  * Импорт SQL дампов в БД

@@ -5,39 +5,45 @@ services:
         public: false
 
     # Adapters
-    SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface:
-        class: SmartCrm\DatabaseDumps\Adapter\DoctrineDbalAdapter
+    BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface:
+        class: BackVista\DatabaseDumps\Adapter\DoctrineDbalAdapter
         arguments:
             $connection: '@doctrine.dbal.default_connection'
 
-    SmartCrm\DatabaseDumps\Contract\FileSystemInterface:
-        class: SmartCrm\DatabaseDumps\Util\FileSystemHelper
+    BackVista\DatabaseDumps\Contract\FileSystemInterface:
+        class: BackVista\DatabaseDumps\Util\FileSystemHelper
 
-    SmartCrm\DatabaseDumps\Contract\ConfigLoaderInterface:
-        class: SmartCrm\DatabaseDumps\Util\YamlConfigLoader
+    BackVista\DatabaseDumps\Contract\ConfigLoaderInterface:
+        class: BackVista\DatabaseDumps\Util\YamlConfigLoader
+
+    # Platform
+    BackVista\DatabaseDumps\Contract\DatabasePlatformInterface:
+        factory: ['BackVista\DatabaseDumps\Platform\PlatformFactory', 'create']
+        arguments:
+            $platformName: '%database_dumps.platform%'
 
     # Config
-    SmartCrm\DatabaseDumps\Config\EnvironmentConfig:
-        factory: ['SmartCrm\DatabaseDumps\Config\EnvironmentConfig', 'fromEnv']
+    BackVista\DatabaseDumps\Config\EnvironmentConfig:
+        factory: ['BackVista\DatabaseDumps\Config\EnvironmentConfig', 'fromEnv']
 
-    SmartCrm\DatabaseDumps\Config\DumpConfig:
-        factory: ['@SmartCrm\DatabaseDumps\Contract\ConfigLoaderInterface', 'load']
+    BackVista\DatabaseDumps\Config\DumpConfig:
+        factory: ['@BackVista\DatabaseDumps\Contract\ConfigLoaderInterface', 'load']
         arguments:
             $path: '%kernel.project_dir%/config/dump_config.yaml'
 
     # Services
-    SmartCrm\DatabaseDumps\:
+    BackVista\DatabaseDumps\:
         resource: '../../../Service/**/*'
 
-    SmartCrm\DatabaseDumps\Service\Dumper\DatabaseDumper:
+    BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
-    SmartCrm\DatabaseDumps\Service\Importer\DatabaseImporter:
+    BackVista\DatabaseDumps\Service\Importer\DatabaseImporter:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
     # Commands
-    SmartCrm\DatabaseDumps\Bridge\Symfony\Command\:
+    BackVista\DatabaseDumps\Bridge\Symfony\Command\:
         resource: '../Command/*'
         tags: ['console.command']

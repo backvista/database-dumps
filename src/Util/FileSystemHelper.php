@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Util;
+namespace BackVista\DatabaseDumps\Util;
 
-use SmartCrm\DatabaseDumps\Contract\FileSystemInterface;
+use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use Symfony\Component\Finder\Finder;
 
 /**

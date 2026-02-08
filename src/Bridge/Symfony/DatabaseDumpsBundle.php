@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Bridge\Symfony;
+namespace BackVista\DatabaseDumps\Bridge\Symfony;
 
-use SmartCrm\DatabaseDumps\Bridge\Symfony\DependencyInjection\DatabaseDumpsExtension;
+use BackVista\DatabaseDumps\Bridge\Symfony\DependencyInjection\DatabaseDumpsExtension;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 /**

@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Generator;
+namespace BackVista\DatabaseDumps\Service\Generator;
 
-use SmartCrm\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
 
 /**
  * Главный генератор SQL дампов

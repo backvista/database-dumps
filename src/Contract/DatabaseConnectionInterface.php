@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Contract;
+namespace BackVista\DatabaseDumps\Contract;
 
 /**
  * Интерфейс для работы с подключением к БД
@@ -16,11 +16,16 @@ interface DatabaseConnectionInterface
 
     /**
      * Получить все строки как ассоциативный массив
+     *
+     * @return array<int, array<string, mixed>>
      */
     public function fetchAllAssociative(string $sql): array;
 
     /**
      * Получить первую колонку всех строк
+     *
+     * @param array<mixed> $params
+     * @return array<int, mixed>
      */
     public function fetchFirstColumn(string $sql, array $params = []): array;
 
@@ -50,4 +55,9 @@ interface DatabaseConnectionInterface
      * Проверить, находимся ли в транзакции
      */
     public function isTransactionActive(): bool;
+
+    /**
+     * Получить имя платформы БД (postgresql, mysql и т.д.)
+     */
+    public function getPlatformName(): string;
 }

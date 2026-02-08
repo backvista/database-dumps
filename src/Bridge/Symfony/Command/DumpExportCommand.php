@@ -1,11 +1,11 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Bridge\Symfony\Command;
+namespace BackVista\DatabaseDumps\Bridge\Symfony\Command;
 
-use SmartCrm\DatabaseDumps\Config\TableConfig;
-use SmartCrm\DatabaseDumps\Exception\ExportFailedException;
-use SmartCrm\DatabaseDumps\Service\Dumper\DatabaseDumper;
-use SmartCrm\DatabaseDumps\Service\Dumper\TableConfigResolver;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Exception\ExportFailedException;
+use BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper;
+use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -74,7 +74,7 @@ class DumpExportCommand extends Command
         } catch (\Exception $e) {
             $io->error('Ошибка экспорта: ' . $e->getMessage());
 
-            if ($output->isVerbose()) {
+            if ($io->isVerbose()) {
                 $io->note('Трейс: ' . $e->getTraceAsString());
             }
 

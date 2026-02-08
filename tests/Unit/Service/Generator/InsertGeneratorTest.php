@@ -1,22 +1,29 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Generator;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Service\Generator\InsertGenerator;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
 
 class InsertGeneratorTest extends TestCase
 {
-    private DatabaseConnectionInterface $connection;
-    private InsertGenerator $generator;
+    /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $connection;
+
+    /** @var InsertGenerator */
+    private $generator;
 
     protected function setUp(): void
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
-        $this->connection->method('quote')->willReturnCallback(fn($value) => "'{$value}'");
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
 
-        $this->generator = new InsertGenerator($this->connection);
+        $platform = new PostgresPlatform();
+        $this->generator = new InsertGenerator($this->connection, $platform);
     }
 
     public function testGenerateWithEmptyRows(): void

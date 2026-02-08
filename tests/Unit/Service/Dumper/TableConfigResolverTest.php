@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Dumper;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\DumpConfig;
-use SmartCrm\DatabaseDumps\Service\Dumper\TableConfigResolver;
+use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 
 class TableConfigResolverTest extends TestCase
 {
@@ -13,11 +13,11 @@ class TableConfigResolverTest extends TestCase
     protected function setUp(): void
     {
         $dumpConfig = new DumpConfig(
-            fullExport: [
+            [
                 'users' => ['users', 'roles'],
                 'system' => ['settings']
             ],
-            partialExport: [
+            [
                 'clients' => [
                     'clients' => ['limit' => 100, 'order_by' => 'created_at DESC']
                 ]

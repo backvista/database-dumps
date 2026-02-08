@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Parser;
+namespace BackVista\DatabaseDumps\Service\Parser;
 
 /**
  * Разбивает SQL файл на отдельные statements
@@ -15,18 +15,20 @@ class StatementSplitter
     public function split(string $sql): array
     {
         // Удаление однострочных комментариев (-- комментарий)
-        $sql = preg_replace('/--.*$/m', '', $sql);
+        $sql = (string) preg_replace('/--.*$/m', '', $sql);
 
         // Удаление многострочных комментариев (/* комментарий */)
-        $sql = preg_replace('/\/\*.*?\*\//s', '', $sql);
+        $sql = (string) preg_replace('/\/\*.*?\*\//s', '', $sql);
 
         // Разбивка по точке с запятой
         $statements = explode(';', $sql);
 
         // Фильтрация пустых statements
-        return array_filter(
+        return array_values(array_filter(
             array_map('trim', $statements),
-            fn($statement) => !empty($statement)
-        );
+            function ($statement) {
+                return !empty($statement);
+            }
+        ));
     }
 }

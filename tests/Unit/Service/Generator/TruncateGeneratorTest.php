@@ -1,17 +1,20 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Generator;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Service\Generator\TruncateGenerator;
+use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Generator\TruncateGenerator;
 
 class TruncateGeneratorTest extends TestCase
 {
-    private TruncateGenerator $generator;
+    /** @var TruncateGenerator */
+    private $generator;
 
     protected function setUp(): void
     {
-        $this->generator = new TruncateGenerator();
+        $platform = new PostgresPlatform();
+        $this->generator = new TruncateGenerator($platform);
     }
 
     public function testGenerate(): void

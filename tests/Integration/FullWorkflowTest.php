@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Integration;
+namespace BackVista\DatabaseDumps\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
 

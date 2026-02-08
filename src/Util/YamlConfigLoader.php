@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Util;
+namespace BackVista\DatabaseDumps\Util;
 
-use SmartCrm\DatabaseDumps\Config\DumpConfig;
-use SmartCrm\DatabaseDumps\Contract\ConfigLoaderInterface;
-use SmartCrm\DatabaseDumps\Exception\ConfigNotFoundException;
+use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Contract\ConfigLoaderInterface;
+use BackVista\DatabaseDumps\Exception\ConfigNotFoundException;
 use Symfony\Component\Yaml\Yaml;
 
 /**

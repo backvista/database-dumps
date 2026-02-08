@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Adapter;
+namespace BackVista\DatabaseDumps\Adapter;
 
 use Doctrine\DBAL\Connection;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 
 /**
  * Адаптер для Doctrine DBAL Connection
@@ -22,11 +22,18 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
         $this->connection->executeStatement($sql);
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
     public function fetchAllAssociative(string $sql): array
     {
         return $this->connection->fetchAllAssociative($sql);
     }
 
+    /**
+     * @param array<mixed> $params
+     * @return array<int, mixed>
+     */
     public function fetchFirstColumn(string $sql, array $params = []): array
     {
         return $this->connection->fetchFirstColumn($sql, $params);
@@ -55,5 +62,21 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
     public function isTransactionActive(): bool
     {
         return $this->connection->isTransactionActive();
+    }
+
+    public function getPlatformName(): string
+    {
+        $platform = $this->connection->getDatabasePlatform();
+        $className = get_class($platform);
+
+        if (strpos($className, 'PostgreSQL') !== false || strpos($className, 'Postgre') !== false) {
+            return 'postgresql';
+        }
+
+        if (strpos($className, 'MySQL') !== false || strpos($className, 'MariaDb') !== false) {
+            return 'mysql';
+        }
+
+        return 'postgresql';
     }
 }

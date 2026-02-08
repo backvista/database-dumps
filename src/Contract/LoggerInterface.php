@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Contract;
+namespace BackVista\DatabaseDumps\Contract;
 
 /**
  * Интерфейс для логирования

@@ -1,21 +1,26 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Dumper;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\TableConfig;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Service\Dumper\DataFetcher;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
 
 class DataFetcherTest extends TestCase
 {
-    private DatabaseConnectionInterface $connection;
-    private DataFetcher $fetcher;
+    /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $connection;
+
+    /** @var DataFetcher */
+    private $fetcher;
 
     protected function setUp(): void
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
-        $this->fetcher = new DataFetcher($this->connection);
+        $platform = new PostgresPlatform();
+        $this->fetcher = new DataFetcher($this->connection, $platform);
     }
 
     public function testFetchFullExport(): void
@@ -39,7 +44,7 @@ class DataFetcherTest extends TestCase
 
     public function testFetchWithLimit(): void
     {
-        $config = new TableConfig('clients', 'clients', limit: 100);
+        $config = new TableConfig('clients', 'clients', 100);
 
         $this->connection
             ->expects($this->once())
@@ -52,7 +57,7 @@ class DataFetcherTest extends TestCase
 
     public function testFetchWithWhere(): void
     {
-        $config = new TableConfig('clients', 'clients', where: 'is_active = true');
+        $config = new TableConfig('clients', 'clients', null, 'is_active = true');
 
         $this->connection
             ->expects($this->once())
@@ -65,7 +70,7 @@ class DataFetcherTest extends TestCase
 
     public function testFetchWithOrderBy(): void
     {
-        $config = new TableConfig('clients', 'clients', orderBy: 'created_at DESC');
+        $config = new TableConfig('clients', 'clients', null, null, 'created_at DESC');
 
         $this->connection
             ->expects($this->once())
@@ -81,9 +86,9 @@ class DataFetcherTest extends TestCase
         $config = new TableConfig(
             'clients',
             'clients',
-            limit: 100,
-            where: 'is_active = true',
-            orderBy: 'created_at DESC'
+            100,
+            'is_active = true',
+            'created_at DESC'
         );
 
         $this->connection

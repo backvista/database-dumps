@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Config;
+namespace BackVista\DatabaseDumps\Tests\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\EnvironmentConfig;
+use BackVista\DatabaseDumps\Config\EnvironmentConfig;
 
 class EnvironmentConfigTest extends TestCase
 {

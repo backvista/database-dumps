@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Exception;
+namespace BackVista\DatabaseDumps\Exception;
 
 use RuntimeException;
 

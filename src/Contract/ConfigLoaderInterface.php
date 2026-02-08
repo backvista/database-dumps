@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Contract;
+namespace BackVista\DatabaseDumps\Contract;
 
-use SmartCrm\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\DumpConfig;
 
 /**
  * Интерфейс для загрузки конфигурации дампов

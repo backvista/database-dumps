@@ -1,52 +1,32 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Generator;
+namespace BackVista\DatabaseDumps\Service\Generator;
 
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
 
 /**
- * Генерация сброса sequences (PostgreSQL)
+ * Генерация сброса sequences / auto-increment
  */
 class SequenceGenerator
 {
-    private DatabaseConnectionInterface $connection;
+    /** @var DatabaseConnectionInterface */
+    private $connection;
 
-    public function __construct(DatabaseConnectionInterface $connection)
+    /** @var DatabasePlatformInterface */
+    private $platform;
+
+    public function __construct(DatabaseConnectionInterface $connection, DatabasePlatformInterface $platform)
     {
         $this->connection = $connection;
+        $this->platform = $platform;
     }
 
     /**
-     * Сгенерировать statements для сброса sequences
+     * Сгенерировать statements для сброса sequences / auto-increment
      */
     public function generate(string $schema, string $table): string
     {
-        $sql = "-- Сброс sequences\n";
-
-        try {
-            // Получаем sequences для таблицы
-            $sequences = $this->connection->fetchFirstColumn(
-                "SELECT pg_get_serial_sequence(:table_name, column_name) as sequence_name
-                 FROM information_schema.columns
-                 WHERE table_schema = :schema
-                 AND table_name = :table
-                 AND column_default LIKE 'nextval%'",
-                [
-                    'schema' => $schema,
-                    'table' => $table,
-                    'table_name' => $schema . '.' . $table
-                ]
-            );
-
-            foreach ($sequences as $sequence) {
-                if ($sequence) {
-                    $sql .= "SELECT setval('{$sequence}', (SELECT COALESCE(MAX(id), 1) FROM \"{$schema}\".\"{$table}\"));\n";
-                }
-            }
-        } catch (\Exception $e) {
-            $sql .= "-- Ошибка получения sequences: " . $e->getMessage() . "\n";
-        }
-
-        return $sql;
+        return $this->platform->getSequenceResetSql($schema, $table, $this->connection);
     }
 }

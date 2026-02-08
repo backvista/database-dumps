@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Config;
+namespace BackVista\DatabaseDumps\Tests\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\DumpConfig;
 
 class DumpConfigTest extends TestCase
 {
@@ -12,17 +12,17 @@ class DumpConfigTest extends TestCase
     protected function setUp(): void
     {
         $this->config = new DumpConfig(
-            fullExport: [
+            [
                 'users' => ['users', 'roles'],
                 'system' => ['settings']
             ],
-            partialExport: [
+            [
                 'clients' => [
                     'clients' => ['limit' => 100, 'order_by' => 'created_at DESC'],
                     'clients_attr' => ['limit' => 500]
                 ]
             ],
-            exclude: ['sessions', 'cache']
+            ['sessions', 'cache']
         );
     }
 

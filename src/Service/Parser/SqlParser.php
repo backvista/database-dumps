@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Parser;
+namespace BackVista\DatabaseDumps\Service\Parser;
 
 /**
  * Парсинг SQL файлов

@@ -1,20 +1,25 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Generator;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Service\Generator\SequenceGenerator;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Generator\SequenceGenerator;
 
 class SequenceGeneratorTest extends TestCase
 {
-    private DatabaseConnectionInterface $connection;
-    private SequenceGenerator $generator;
+    /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
+    private $connection;
+
+    /** @var SequenceGenerator */
+    private $generator;
 
     protected function setUp(): void
     {
         $this->connection = $this->createMock(DatabaseConnectionInterface::class);
-        $this->generator = new SequenceGenerator($this->connection);
+        $platform = new PostgresPlatform();
+        $this->generator = new SequenceGenerator($this->connection, $platform);
     }
 
     public function testGenerateWithSequences(): void

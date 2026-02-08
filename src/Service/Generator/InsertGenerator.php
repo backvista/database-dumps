@@ -1,8 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Generator;
+namespace BackVista\DatabaseDumps\Service\Generator;
 
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
 
 /**
  * Генерация INSERT statements с батчингом
@@ -11,11 +12,16 @@ class InsertGenerator
 {
     private const BATCH_SIZE = 1000;
 
-    private DatabaseConnectionInterface $connection;
+    /** @var DatabaseConnectionInterface */
+    private $connection;
 
-    public function __construct(DatabaseConnectionInterface $connection)
+    /** @var DatabasePlatformInterface */
+    private $platform;
+
+    public function __construct(DatabaseConnectionInterface $connection, DatabasePlatformInterface $platform)
     {
         $this->connection = $connection;
+        $this->platform = $platform;
     }
 
     /**
@@ -32,7 +38,7 @@ class InsertGenerator
             return "-- Таблица пуста, нет данных для импорта\n";
         }
 
-        $fullTable = $this->quoteIdentifier($schema, $table);
+        $fullTable = $this->platform->getFullTableName($schema, $table);
         $batches = array_chunk($rows, self::BATCH_SIZE);
         $sql = '';
         $batchNum = 1;
@@ -61,7 +67,10 @@ class InsertGenerator
         }
 
         $columns = array_keys($rows[0]);
-        $columnsList = implode(', ', array_map(fn($col) => "\"{$col}\"", $columns));
+        $platform = $this->platform;
+        $columnsList = implode(', ', array_map(function ($col) use ($platform) {
+            return $platform->quoteIdentifier($col);
+        }, $columns));
 
         $sql = "INSERT INTO {$fullTable} ({$columnsList}) VALUES\n";
 
@@ -81,13 +90,5 @@ class InsertGenerator
         $sql .= implode(",\n", $values) . ";\n";
 
         return $sql;
-    }
-
-    /**
-     * Экранировать идентификатор (схема.таблица)
-     */
-    private function quoteIdentifier(string $schema, string $table): string
-    {
-        return "\"{$schema}\".\"{$table}\"";
     }
 }

@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Config;
+namespace BackVista\DatabaseDumps\Tests\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
 
 class TableConfigTest extends TestCase
 {
@@ -24,11 +24,11 @@ class TableConfigTest extends TestCase
     public function testPartialExportConfig(): void
     {
         $config = new TableConfig(
-            schema: 'clients',
-            table: 'clients',
-            limit: 100,
-            where: 'is_active = true',
-            orderBy: 'created_at DESC'
+            'clients',
+            'clients',
+            100,
+            'is_active = true',
+            'created_at DESC'
         );
 
         $this->assertEquals('clients', $config->getSchema());

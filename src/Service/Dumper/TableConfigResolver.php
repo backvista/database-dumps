@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Dumper;
+namespace BackVista\DatabaseDumps\Service\Dumper;
 
-use SmartCrm\DatabaseDumps\Config\DumpConfig;
-use SmartCrm\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\TableConfig;
 
 /**
  * Получение конфигурации таблицы для экспорта

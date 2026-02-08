@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Security;
+namespace BackVista\DatabaseDumps\Service\Security;
 
-use SmartCrm\DatabaseDumps\Config\EnvironmentConfig;
+use BackVista\DatabaseDumps\Config\EnvironmentConfig;
 
 /**
  * Проверка текущего окружения

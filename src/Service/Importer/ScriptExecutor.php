@@ -1,11 +1,11 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Importer;
+namespace BackVista\DatabaseDumps\Service\Importer;
 
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
-use SmartCrm\DatabaseDumps\Contract\FileSystemInterface;
-use SmartCrm\DatabaseDumps\Contract\LoggerInterface;
-use SmartCrm\DatabaseDumps\Service\Parser\SqlParser;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\FileSystemInterface;
+use BackVista\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Service\Parser\SqlParser;
 
 /**
  * Выполнение before/after exec SQL скриптов

@@ -1,12 +1,12 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Security;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Security;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\EnvironmentConfig;
-use SmartCrm\DatabaseDumps\Exception\ProductionEnvironmentException;
-use SmartCrm\DatabaseDumps\Service\Security\EnvironmentChecker;
-use SmartCrm\DatabaseDumps\Service\Security\ProductionGuard;
+use BackVista\DatabaseDumps\Config\EnvironmentConfig;
+use BackVista\DatabaseDumps\Exception\ProductionEnvironmentException;
+use BackVista\DatabaseDumps\Service\Security\EnvironmentChecker;
+use BackVista\DatabaseDumps\Service\Security\ProductionGuard;
 
 class ProductionGuardTest extends TestCase
 {

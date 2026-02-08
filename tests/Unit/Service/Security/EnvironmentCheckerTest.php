@@ -1,10 +1,10 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Security;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Security;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Config\EnvironmentConfig;
-use SmartCrm\DatabaseDumps\Service\Security\EnvironmentChecker;
+use BackVista\DatabaseDumps\Config\EnvironmentConfig;
+use BackVista\DatabaseDumps\Service\Security\EnvironmentChecker;
 
 class EnvironmentCheckerTest extends TestCase
 {

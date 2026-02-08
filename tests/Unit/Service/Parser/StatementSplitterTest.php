@@ -1,9 +1,9 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Tests\Unit\Service\Parser;
+namespace BackVista\DatabaseDumps\Tests\Unit\Service\Parser;
 
 use PHPUnit\Framework\TestCase;
-use SmartCrm\DatabaseDumps\Service\Parser\StatementSplitter;
+use BackVista\DatabaseDumps\Service\Parser\StatementSplitter;
 
 class StatementSplitterTest extends TestCase
 {

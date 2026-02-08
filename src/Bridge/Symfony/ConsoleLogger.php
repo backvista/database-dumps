@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Bridge\Symfony;
+namespace BackVista\DatabaseDumps\Bridge\Symfony;
 
-use SmartCrm\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**

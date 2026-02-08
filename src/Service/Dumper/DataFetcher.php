@@ -1,20 +1,26 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Dumper;
+namespace BackVista\DatabaseDumps\Service\Dumper;
 
-use SmartCrm\DatabaseDumps\Config\TableConfig;
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
 
 /**
  * Загрузка данных из таблицы
  */
 class DataFetcher
 {
-    private DatabaseConnectionInterface $connection;
+    /** @var DatabaseConnectionInterface */
+    private $connection;
 
-    public function __construct(DatabaseConnectionInterface $connection)
+    /** @var DatabasePlatformInterface */
+    private $platform;
+
+    public function __construct(DatabaseConnectionInterface $connection, DatabasePlatformInterface $platform)
     {
         $this->connection = $connection;
+        $this->platform = $platform;
     }
 
     /**
@@ -24,7 +30,7 @@ class DataFetcher
      */
     public function fetch(TableConfig $config): array
     {
-        $fullTable = $this->quoteIdentifier($config->getSchema(), $config->getTable());
+        $fullTable = $this->platform->getFullTableName($config->getSchema(), $config->getTable());
         $sql = "SELECT * FROM {$fullTable}";
 
         if ($config->getWhere()) {
@@ -40,13 +46,5 @@ class DataFetcher
         }
 
         return $this->connection->fetchAllAssociative($sql);
-    }
-
-    /**
-     * Экранировать идентификатор (схема.таблица)
-     */
-    private function quoteIdentifier(string $schema, string $table): string
-    {
-        return "\"{$schema}\".\"{$table}\"";
     }
 }

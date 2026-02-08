@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Security;
+namespace BackVista\DatabaseDumps\Service\Security;
 
-use SmartCrm\DatabaseDumps\Exception\ProductionEnvironmentException;
+use BackVista\DatabaseDumps\Exception\ProductionEnvironmentException;
 
 /**
  * Защита от опасных операций в production

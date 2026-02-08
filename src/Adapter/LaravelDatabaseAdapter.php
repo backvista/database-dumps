@@ -1,0 +1,98 @@
+<?php
+
+namespace BackVista\DatabaseDumps\Adapter;
+
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use Illuminate\Database\Connection;
+
+/**
+ * Адаптер для Laravel Database Connection
+ */
+class LaravelDatabaseAdapter implements DatabaseConnectionInterface
+{
+    /** @var Connection */
+    private $connection;
+
+    public function __construct(Connection $connection)
+    {
+        $this->connection = $connection;
+    }
+
+    public function executeStatement(string $sql): void
+    {
+        $this->connection->statement($sql);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function fetchAllAssociative(string $sql): array
+    {
+        $results = $this->connection->select($sql);
+
+        return array_map(function ($row) {
+            return (array) $row;
+        }, $results);
+    }
+
+    /**
+     * @param array<mixed> $params
+     * @return array<int, mixed>
+     */
+    public function fetchFirstColumn(string $sql, array $params = []): array
+    {
+        $results = $this->connection->select($sql, $params);
+
+        return array_map(function ($row) {
+            $arr = (array) $row;
+            return reset($arr);
+        }, $results);
+    }
+
+    /**
+     * @param mixed $value
+     */
+    public function quote($value): string
+    {
+        if (is_string($value)) {
+            return $this->connection->getPdo()->quote($value);
+        }
+
+        return $this->connection->getPdo()->quote((string) $value);
+    }
+
+    public function beginTransaction(): void
+    {
+        $this->connection->beginTransaction();
+    }
+
+    public function commit(): void
+    {
+        $this->connection->commit();
+    }
+
+    public function rollBack(): void
+    {
+        $this->connection->rollBack();
+    }
+
+    public function isTransactionActive(): bool
+    {
+        return $this->connection->transactionLevel() > 0;
+    }
+
+    public function getPlatformName(): string
+    {
+        $driver = $this->connection->getDriverName();
+
+        switch ($driver) {
+            case 'pgsql':
+                return 'postgresql';
+            case 'mysql':
+            case 'mariadb':
+                return 'mysql';
+            default:
+                return $driver;
+        }
+    }
+}

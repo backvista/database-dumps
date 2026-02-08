@@ -1,8 +1,8 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Importer;
+namespace BackVista\DatabaseDumps\Service\Importer;
 
-use SmartCrm\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 
 /**
  * Управление транзакциями БД

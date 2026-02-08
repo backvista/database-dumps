@@ -1,12 +1,12 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Service\Dumper;
+namespace BackVista\DatabaseDumps\Service\Dumper;
 
-use SmartCrm\DatabaseDumps\Config\TableConfig;
-use SmartCrm\DatabaseDumps\Contract\FileSystemInterface;
-use SmartCrm\DatabaseDumps\Contract\LoggerInterface;
-use SmartCrm\DatabaseDumps\Exception\ExportFailedException;
-use SmartCrm\DatabaseDumps\Service\Generator\SqlGenerator;
+use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\FileSystemInterface;
+use BackVista\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Exception\ExportFailedException;
+use BackVista\DatabaseDumps\Service\Generator\SqlGenerator;
 
 /**
  * Экспорт данных из БД в SQL дампы

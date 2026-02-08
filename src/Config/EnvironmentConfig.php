@@ -1,6 +1,6 @@
 <?php
 
-namespace SmartCrm\DatabaseDumps\Config;
+namespace BackVista\DatabaseDumps\Config;
 
 /**
  * DTO для конфигурации окружения
