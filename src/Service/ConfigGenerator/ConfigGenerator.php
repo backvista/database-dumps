@@ -14,7 +14,7 @@ use Symfony\Component\Yaml\Yaml;
  */
 class ConfigGenerator
 {
-    public const WHERE_HINT = '#where: "1=1 --OR is_active=1"';
+    public const WHERE_HINT = 'where: "1=1"';
 
     /** @var TableInspector */
     private $inspector;
