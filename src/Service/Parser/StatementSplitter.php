@@ -14,21 +14,100 @@ class StatementSplitter
      */
     public function split(string $sql): array
     {
-        // Удаление однострочных комментариев (-- комментарий)
-        $sql = (string) preg_replace('/--.*$/m', '', $sql);
+        $statements = [];
+        $current = '';
+        $len = strlen($sql);
+        $i = 0;
 
-        // Удаление многострочных комментариев (/* комментарий */)
-        $sql = (string) preg_replace('/\/\*.*?\*\//s', '', $sql);
+        while ($i < $len) {
+            $char = $sql[$i];
 
-        // Разбивка по точке с запятой
-        $statements = explode(';', $sql);
-
-        // Фильтрация пустых statements
-        return array_values(array_filter(
-            array_map('trim', $statements),
-            function ($statement) {
-                return !empty($statement);
+            // Однострочный комментарий: --
+            if ($char === '-' && $i + 1 < $len && $sql[$i + 1] === '-') {
+                $end = strpos($sql, "\n", $i);
+                $i = $end === false ? $len : $end + 1;
+                continue;
             }
-        ));
+
+            // Многострочный комментарий: /* ... */
+            if ($char === '/' && $i + 1 < $len && $sql[$i + 1] === '*') {
+                $end = strpos($sql, '*/', $i + 2);
+                $i = $end === false ? $len : $end + 2;
+                continue;
+            }
+
+            // Строковый литерал (одинарные кавычки)
+            if ($char === '\'') {
+                $current .= $char;
+                $i++;
+                while ($i < $len) {
+                    $c = $sql[$i];
+                    $current .= $c;
+                    if ($c === '\\' && $i + 1 < $len) {
+                        // Backslash-escape (MySQL style)
+                        $i++;
+                        $current .= $sql[$i];
+                        $i++;
+                        continue;
+                    }
+                    if ($c === '\'' && $i + 1 < $len && $sql[$i + 1] === '\'') {
+                        // Escaped quote '' (SQL standard)
+                        $i++;
+                        $current .= $sql[$i];
+                        $i++;
+                        continue;
+                    }
+                    if ($c === '\'') {
+                        $i++;
+                        break;
+                    }
+                    $i++;
+                }
+                continue;
+            }
+
+            // Идентификатор в двойных кавычках
+            if ($char === '"') {
+                $current .= $char;
+                $i++;
+                while ($i < $len) {
+                    $c = $sql[$i];
+                    $current .= $c;
+                    if ($c === '"' && $i + 1 < $len && $sql[$i + 1] === '"') {
+                        $i++;
+                        $current .= $sql[$i];
+                        $i++;
+                        continue;
+                    }
+                    if ($c === '"') {
+                        $i++;
+                        break;
+                    }
+                    $i++;
+                }
+                continue;
+            }
+
+            // Разделитель statements
+            if ($char === ';') {
+                $trimmed = trim($current);
+                if ($trimmed !== '') {
+                    $statements[] = $trimmed;
+                }
+                $current = '';
+                $i++;
+                continue;
+            }
+
+            $current .= $char;
+            $i++;
+        }
+
+        $trimmed = trim($current);
+        if ($trimmed !== '') {
+            $statements[] = $trimmed;
+        }
+
+        return $statements;
     }
 }
