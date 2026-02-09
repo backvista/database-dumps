@@ -90,4 +90,65 @@ SQL;
         $this->assertStringContainsString('INSERT', $statements[1]);
         $this->assertStringContainsString('setval', $statements[2]);
     }
+
+    public function testSplitWithNewlinesInsideStringLiterals(): void
+    {
+        $sql = "INSERT INTO changelog (id, description) VALUES (1, 'Необходимо создать новый проект на Java:\ncrypto.vasl-bank-gate\nВерсия Java 21');";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(1, $statements);
+        $this->assertStringContainsString("Необходимо создать новый проект на Java:\ncrypto.vasl-bank-gate\nВерсия Java 21", $statements[0]);
+    }
+
+    public function testSplitWithSemicolonInsideStringLiteral(): void
+    {
+        $sql = "INSERT INTO t (data) VALUES ('value;with;semicolons'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'value;with;semicolons'", $statements[0]);
+        $this->assertEquals('SELECT 1', $statements[1]);
+    }
+
+    public function testSplitWithDoubleDashInsideStringLiteral(): void
+    {
+        $sql = "INSERT INTO t (data) VALUES ('some -- not a comment'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'some -- not a comment'", $statements[0]);
+    }
+
+    public function testSplitWithEscapedQuotes(): void
+    {
+        $sql = "INSERT INTO t (data) VALUES ('it''s a test'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'it''s a test'", $statements[0]);
+    }
+
+    public function testSplitWithBackslashEscapedQuotes(): void
+    {
+        $sql = "INSERT INTO t (data) VALUES ('it\\'s a test'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'it\\'s a test'", $statements[0]);
+    }
+
+    public function testSplitWithBlockCommentInsideString(): void
+    {
+        $sql = "INSERT INTO t (data) VALUES ('/* not a comment */'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'/* not a comment */'", $statements[0]);
+    }
 }
