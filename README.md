@@ -16,6 +16,7 @@ PHP-пакет для экспорта и импорта дампов баз д�
 
 ## Оглавление
 
+- [Описание](#описание)
 - [Возможности](#возможности)
 - [Установка](#установка)
 - [Быстрый старт](#быстрый-старт)
@@ -51,6 +52,23 @@ PHP-пакет для экспорта и импорта дампов баз д�
 - [Лицензия](#лицензия)
 
 ---
+
+## Описание
+
+**Database Dumps** — это PHP-пакет, который помогает разработчикам создавать и разворачивать дампы базы данных для локальной и тестовой среды.
+
+**Какую проблему решает?** На проекте с большой боевой базой разработчику нужно иметь актуальные тестовые данные — но копировать всю базу долго, а персональные данные клиентов нельзя использовать в dev-окружении. Этот пакет позволяет настроить правила экспорта один раз: какие таблицы забирать целиком, какие — частично, и забыть о ручной подготовке дампов.
+
+**Как работает?** Вы описываете в YAML-файле, какие таблицы и как экспортировать. Пакет сам:
+- генерирует SQL-дампы из боевой (или staging) базы с учётом FK-зависимостей между таблицами
+- заменяет персональные данные (ФИО, email, телефоны) на сгенерированные, чтобы дампы были безопасны
+- разворачивает дампы в нужную базу одной командой, с защитой от случайного запуска на продакшене
+
+**Где применим?** В любом PHP-проекте на Symfony или Laravel (или без фреймворка), где нужно:
+- быстро разворачивать тестовую базу для разработчиков
+- передавать дампы между командами без утечки персональных данных
+- держать seed-данные в репозитории и обновлять их из реальной базы
+- работать с несколькими базами данных одновременно
 
 ## Возможности
 
@@ -715,6 +733,7 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 
 ## Table of Contents
 
+- [Description](#description)
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
@@ -750,6 +769,23 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 - [License](#license)
 
 ---
+
+## Description
+
+**Database Dumps** is a PHP package that helps developers create and deploy database dumps for local and test environments.
+
+**What problem does it solve?** On a project with a large production database, developers need up-to-date test data — but copying the entire database is slow, and using real customer data in dev environments is not acceptable. This package lets you configure export rules once — which tables to grab in full, which partially — and forget about manual dump preparation.
+
+**How does it work?** You describe export rules in a YAML file. The package then:
+- generates SQL dumps from production (or staging) database, respecting FK dependencies between tables
+- replaces personal data (Russian names, emails, phone numbers) with generated values, making dumps safe to use
+- deploys dumps into the target database with a single command, with built-in protection against accidental runs on production
+
+**Where is it useful?** In any PHP project using Symfony or Laravel (or standalone), where you need to:
+- quickly set up a test database for developers
+- share dumps across teams without leaking personal data
+- keep seed data in the repository and update it from a real database
+- work with multiple database connections simultaneously
 
 ## Features
 
