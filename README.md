@@ -12,7 +12,7 @@
 
 # Русский
 
-Фреймворк-агностичный PHP-пакет для управления дампами баз данных — экспорт и импорт SQL с поддержкой PostgreSQL и MySQL.
+PHP-пакет для экспорта и импорта дампов баз данных в SQL. Поддерживает PostgreSQL и MySQL. Работает с Symfony, Laravel и любым PHP-проектом.
 
 ## Оглавление
 
@@ -22,11 +22,10 @@
   - [Symfony](#быстрый-старт-symfony)
   - [Laravel](#быстрый-старт-laravel)
 - [Конфигурация](#конфигурация)
-  - [Формат YAML](#формат-yaml)
-    - [Полный экспорт (full_export)](#полный-экспорт-full_export)
-    - [Частичный экспорт (partial_export)](#частичный-экспорт-partial_export)
-  - [Несколько подключений (multi-connection)](#несколько-подключений-multi-connection)
-  - [Автогенерация конфигурации (prepare-config)](#автогенерация-конфигурации-prepare-config)
+  - [Полный экспорт (full_export)](#полный-экспорт-full_export)
+  - [Частичный экспорт (partial_export)](#частичный-экспорт-partial_export)
+  - [Несколько подключений](#несколько-подключений)
+  - [Автогенерация конфигурации](#автогенерация-конфигурации)
 - [Настройка Symfony](#настройка-symfony)
   - [Регистрация бандла](#регистрация-бандла)
   - [Структура каталогов (Symfony)](#структура-каталогов-symfony)
@@ -38,10 +37,10 @@
 - [Скрипты before/after](#скрипты-beforeafter)
 - [Поддержка IDE (JSON Schema)](#поддержка-ide-json-schema)
 - [Архитектура](#архитектура)
-  - [Поток экспорта](#поток-экспорта)
-  - [Поток импорта](#поток-импорта)
-  - [Абстракция платформы](#абстракция-платформы)
-  - [Структура каталогов src/](#структура-каталогов-src)
+  - [Как работает экспорт](#как-работает-экспорт)
+  - [Как работает импорт](#как-работает-импорт)
+  - [Различия платформ](#различия-платформ)
+  - [Структура исходного кода](#структура-исходного-кода)
 - [Безопасность](#безопасность)
 - [Тестирование](#тестирование)
 - [Локальная разработка](#локальная-разработка)
@@ -52,16 +51,16 @@
 
 ## Возможности
 
-- **Фреймворк-агностичность** — работает с Symfony, Laravel и любым PHP-проектом
-- **PostgreSQL и MySQL** — абстракция диалектов SQL через платформы
-- **Несколько подключений** — экспорт/импорт для нескольких баз данных одновременно
-- **Умный батчинг** — автоматическая группировка INSERT (1000 строк на выражение)
-- **Транзакционность** — автоматический откат при ошибках
-- **Защита от продакшена** — блокировка импорта в production-окружениях
-- **Хуки before/after** — пользовательские SQL-скрипты до и после импорта
-- **Гибкая конфигурация** — YAML-правила для полного и частичного экспорта
-- **Сброс последовательностей** — автоматический сброс sequence/auto-increment
-- **Автогенерация конфигурации** — команда `prepare-config` создаёт YAML на основе структуры БД
+- **Не привязан к фреймворку** — работает с Symfony, Laravel и любым PHP-проектом
+- **PostgreSQL и MySQL** — автоматически генерирует правильный SQL для каждой СУБД
+- **Несколько подключений** — экспорт/импорт сразу из нескольких баз данных
+- **Пакетные INSERT** — автоматическая группировка по 1000 строк на выражение
+- **Откат при ошибках** — импорт выполняется в транзакции
+- **Защита от продакшена** — импорт заблокирован при `APP_ENV=prod`
+- **Скрипты до/после** — свои SQL-скрипты до и после импорта
+- **Гибкая настройка** — YAML-файл с правилами полного и частичного экспорта
+- **Сброс счётчиков** — автоматический сброс sequence / auto-increment после импорта
+- **Автогенерация конфига** — команда `prepare-config` создаёт YAML по структуре БД
 
 ## Установка
 
@@ -75,9 +74,9 @@ composer require backvista/database-dumps
 
 ### Symfony
 
-1. Бандл авторегистрируется через Symfony Flex.
+1. Бандл регистрируется автоматически через Symfony Flex.
 
-2. Создайте `config/dump_config.yaml`:
+2. Создайте файл `config/dump_config.yaml`:
 
 ```yaml
 full_export:
@@ -92,13 +91,13 @@ partial_export:
       order_by: created_at DESC
 ```
 
-3. Экспорт:
+3. Экспортируйте дампы:
 
 ```bash
 php bin/console app:dbdump:export all
 ```
 
-4. Импорт:
+4. Импортируйте дампы:
 
 ```bash
 php bin/console app:dbdump:import
@@ -108,17 +107,17 @@ php bin/console app:dbdump:import
 
 ### Laravel
 
-1. Сервис-провайдер обнаруживается автоматически. Файл `database/dump_config.yaml` создаётся при первом запуске.
+1. Сервис-провайдер подключается автоматически. Файл `database/dump_config.yaml` создаётся при первом запуске.
 
 2. Отредактируйте `database/dump_config.yaml` (формат тот же, что и для Symfony).
 
-3. Экспорт:
+3. Экспортируйте дампы:
 
 ```bash
 php artisan dbdump:export all
 ```
 
-4. Импорт:
+4. Импортируйте дампы:
 
 ```bash
 php artisan dbdump:import
@@ -126,16 +125,16 @@ php artisan dbdump:import
 
 ## Конфигурация
 
-### Формат YAML
+Экспорт настраивается через YAML-файл. В нём две секции: `full_export` (все строки) и `partial_export` (с ограничениями).
 
 #### Полный экспорт (full_export)
 
-Экспорт **всех строк** из указанных таблиц:
+Экспортирует **все строки** из указанных таблиц:
 
 ```yaml
 full_export:
   public:          # имя схемы
-    - users        # таблицы, все строки
+    - users        # таблицы — все строки
     - roles
   system:
     - settings
@@ -143,7 +142,7 @@ full_export:
 
 #### Частичный экспорт (partial_export)
 
-Экспорт **ограниченного количества строк** с фильтрацией:
+Экспортирует **часть строк** с фильтрацией:
 
 ```yaml
 partial_export:
@@ -151,7 +150,7 @@ partial_export:
     clients:
       limit: 1000                    # максимум строк
       order_by: created_at DESC      # сортировка
-      where: "is_active = true"      # фильтр WHERE
+      where: "is_active = true"      # условие WHERE
     orders:
       limit: 5000
       order_by: id DESC
@@ -161,16 +160,16 @@ partial_export:
 
 | Опция | Описание |
 |-------|----------|
-| `limit` | Максимальное количество строк для экспорта |
-| `order_by` | SQL ORDER BY (должен заканчиваться на `ASC` или `DESC`) |
-| `where` | SQL WHERE условие |
+| `limit` | Максимум строк |
+| `order_by` | Сортировка (должна заканчиваться на `ASC` или `DESC`) |
+| `where` | Условие WHERE |
 
-### Несколько подключений (multi-connection)
+### Несколько подключений
 
-Для работы с несколькими базами данных добавьте секцию `connections`:
+Если нужно работать с несколькими базами данных, добавьте секцию `connections`:
 
 ```yaml
-# Конфигурация подключения по умолчанию
+# Основное подключение
 full_export:
   public:
     - users
@@ -183,7 +182,7 @@ partial_export:
 
 # Дополнительные подключения
 connections:
-  analytics:                 # имя подключения (совпадает с именем в framework)
+  analytics:                 # имя подключения (как в настройках фреймворка)
     full_export:
       analytics:
         - events
@@ -195,26 +194,26 @@ connections:
           order_by: id DESC
 ```
 
-**Пути дампов:**
-- Подключение по умолчанию: `database/dumps/{schema}/{table}.sql`
+**Куда сохраняются дампы:**
+- Основное подключение: `database/dumps/{schema}/{table}.sql`
 - Именованное подключение: `database/dumps/{connection}/{schema}/{table}.sql`
 
-**Использование с опцией `--connection`:**
+**Опция `--connection`:**
 
 ```bash
-# Экспорт только из подключения по умолчанию (без опции)
+# Только основное подключение (по умолчанию)
 php artisan dbdump:export all
 
-# Экспорт только из указанного подключения
+# Только указанное подключение
 php artisan dbdump:export all --connection=analytics
 
-# Экспорт из всех подключений
+# Все подключения сразу
 php artisan dbdump:export all --connection=all
 ```
 
-### Автогенерация конфигурации (prepare-config)
+### Автогенерация конфигурации
 
-Команда `prepare-config` анализирует структуру БД и генерирует `dump_config.yaml` автоматически:
+Команда `prepare-config` смотрит на структуру БД и сама создаёт `dump_config.yaml`:
 
 ```bash
 # Symfony
@@ -228,12 +227,12 @@ php artisan dbdump:prepare-config
 
 | Опция | Описание | По умолчанию |
 |-------|----------|-------------|
-| `--threshold`, `-t` | Порог строк: таблицы <= порога попадают в full_export, выше — в partial_export | 500 |
-| `--force`, `-f` | Перезаписать существующий файл без подтверждения | — |
+| `--threshold`, `-t` | Порог строк: таблицы с количеством строк <= порога идут в full_export, больше — в partial_export | 500 |
+| `--force`, `-f` | Перезаписать файл без подтверждения | — |
 
-**Логика распределения:**
-- Строк <= `threshold` — `full_export` (все строки)
-- Строк > `threshold` — `partial_export` (с limit и автоопределённой сортировкой)
+**Как распределяются таблицы:**
+- Строк <= порога — `full_export`
+- Строк > порога — `partial_export` (с limit и автоопределённой сортировкой)
 - Пустые таблицы — пропускаются
 - Служебные таблицы (migrations, sessions, cache_*, telescope_*, oauth_*, audit_*) — пропускаются
 
@@ -241,7 +240,7 @@ php artisan dbdump:prepare-config
 
 ### Регистрация бандла
 
-Бандл авторегистрируется через Symfony Flex. Если нет, добавьте в `config/bundles.php`:
+Бандл регистрируется автоматически через Symfony Flex. Если нет — добавьте в `config/bundles.php`:
 
 ```php
 return [
@@ -250,7 +249,7 @@ return [
 ];
 ```
 
-Укажите параметр платформы в `services.yaml`:
+Укажите платформу в `services.yaml`:
 
 ```yaml
 parameters:
@@ -264,7 +263,7 @@ parameters:
 ```
 your-symfony-project/
 ├── config/
-│   └── dump_config.yaml          # конфигурация экспорта
+│   └── dump_config.yaml          # настройки экспорта
 ├── database/
 │   ├── before_exec/              # скрипты до импорта
 │   │   └── 01_prepare.sql
@@ -285,13 +284,13 @@ your-symfony-project/
 # Экспорт всех таблиц
 php bin/console app:dbdump:export all
 
-# Экспорт конкретной таблицы
+# Экспорт одной таблицы
 php bin/console app:dbdump:export public.users
 
-# Экспорт с фильтром по схеме
+# Экспорт только из одной схемы
 php bin/console app:dbdump:export all --schema=public
 
-# Экспорт с указанием подключения
+# Экспорт из конкретного подключения
 php bin/console app:dbdump:export all --connection=analytics
 php bin/console app:dbdump:export all --connection=all
 
@@ -303,7 +302,7 @@ php bin/console app:dbdump:import --skip-before --skip-after
 php bin/console app:dbdump:import --schema=public
 php bin/console app:dbdump:import --connection=all
 
-# Автогенерация конфигурации
+# Сгенерировать конфигурацию по структуре БД
 php bin/console app:dbdump:prepare-config
 php bin/console app:dbdump:prepare-config --threshold=1000 --force
 ```
@@ -312,7 +311,7 @@ php bin/console app:dbdump:prepare-config --threshold=1000 --force
 
 ### Регистрация провайдера
 
-Сервис-провайдер обнаруживается автоматически. Если нет, зарегистрируйте вручную в `config/app.php`:
+Сервис-провайдер подключается автоматически. Если нет — зарегистрируйте в `config/app.php`:
 
 ```php
 'providers' => [
@@ -323,13 +322,13 @@ php bin/console app:dbdump:prepare-config --threshold=1000 --force
 
 ### Публикация конфигурации
 
-Для изменения путей опубликуйте PHP-конфигурацию:
+Чтобы изменить пути, опубликуйте PHP-конфигурацию:
 
 ```bash
 php artisan vendor:publish --tag=database-dumps-config
 ```
 
-Создаётся `config/database-dumps.php`:
+Появится файл `config/database-dumps.php`:
 
 ```php
 return [
@@ -344,13 +343,13 @@ return [
 # Экспорт всех таблиц
 php artisan dbdump:export all
 
-# Экспорт конкретной таблицы
+# Экспорт одной таблицы
 php artisan dbdump:export public.users
 
-# Экспорт с фильтром по схеме
+# Экспорт только из одной схемы
 php artisan dbdump:export all --schema=public
 
-# Экспорт с указанием подключения
+# Экспорт из конкретного подключения
 php artisan dbdump:export all --connection=analytics
 php artisan dbdump:export all --connection=all
 
@@ -362,21 +361,21 @@ php artisan dbdump:import --skip-before --skip-after
 php artisan dbdump:import --schema=public
 php artisan dbdump:import --connection=all
 
-# Автогенерация конфигурации
+# Сгенерировать конфигурацию по структуре БД
 php artisan dbdump:prepare-config
 php artisan dbdump:prepare-config --threshold=1000 --force
 ```
 
 ## Скрипты before/after
 
-Выполнение пользовательских SQL-скриптов до и после импорта.
+Можно выполнять свои SQL-скрипты до и после импорта.
 
-| Каталог | Момент выполнения |
+| Каталог | Когда выполняется |
 |---------|-------------------|
 | `database/before_exec/` | **до** импорта дампов |
 | `database/after_exec/` | **после** импорта дампов |
 
-Скрипты выполняются в **алфавитном порядке**. Используйте числовые префиксы для управления порядком:
+Скрипты выполняются в **алфавитном порядке**. Используйте числовые префиксы для управления очерёдностью:
 
 ```
 database/before_exec/
@@ -387,7 +386,7 @@ database/after_exec/
 ├── 02_refresh_views.sql
 ```
 
-Для пропуска скриптов используйте опции `--skip-before` и `--skip-after`:
+Чтобы пропустить скрипты, используйте `--skip-before` и `--skip-after`:
 
 ```bash
 php artisan dbdump:import --skip-before
@@ -397,7 +396,7 @@ php artisan dbdump:import --skip-before --skip-after
 
 ## Поддержка IDE (JSON Schema)
 
-Пакет включает JSON Schema для `dump_config.yaml` в `resources/dump_config.schema.json`. Это даёт автодополнение, валидацию и подсказки в PHPStorm и других IDE.
+В пакете есть JSON Schema для `dump_config.yaml` — файл `resources/dump_config.schema.json`. Он даёт автодополнение и валидацию в PHPStorm и других IDE.
 
 ### Вариант 1: YAML-комментарий (рекомендуется)
 
@@ -407,7 +406,7 @@ php artisan dbdump:import --skip-before --skip-after
 # yaml-language-server: $schema=../vendor/backvista/database-dumps/resources/dump_config.schema.json
 ```
 
-> Для Symfony путь относительно `config/`, для Laravel — относительно `database/`.
+> Путь указывается относительно файла: для Symfony — относительно `config/`, для Laravel — относительно `database/`.
 
 ### Вариант 2: Настройка PHPStorm вручную
 
@@ -418,50 +417,50 @@ php artisan dbdump:import --skip-before --skip-after
 
 ## Архитектура
 
-### Поток экспорта
+### Как работает экспорт
 
 ```
-Command → TableConfigResolver → DatabaseDumper → DataFetcher → SqlGenerator → .sql файлы
+Команда → TableConfigResolver → DatabaseDumper → DataFetcher → SqlGenerator → .sql файлы
 ```
 
-1. **TableConfigResolver** — разрешает YAML-конфигурацию в массив `TableConfig[]`
-2. **DatabaseDumper** — оркестрирует процесс экспорта
+1. **TableConfigResolver** — читает YAML и собирает список таблиц для экспорта
+2. **DatabaseDumper** — управляет процессом экспорта
 3. **DataFetcher** — получает данные из БД через `ConnectionRegistry`
-4. **SqlGenerator** — генерирует SQL (TRUNCATE + INSERT + сброс последовательностей)
-5. Результат записывается в `database/dumps/{schema}/{table}.sql`
+4. **SqlGenerator** — генерирует SQL: TRUNCATE + INSERT + сброс счётчиков
+5. Результат сохраняется в `database/dumps/{schema}/{table}.sql`
 
-### Поток импорта
+### Как работает импорт
 
 ```
-Command → DatabaseImporter → ProductionGuard → TransactionManager → ScriptExecutor → SqlParser → выполнение
+Команда → DatabaseImporter → ProductionGuard → TransactionManager → ScriptExecutor → SqlParser → выполнение
 ```
 
-1. **ProductionGuard** — блокирует импорт в production
-2. **TransactionManager** — оборачивает операции в транзакцию
-3. **ScriptExecutor** — выполняет `before_exec/` скрипты
+1. **ProductionGuard** — проверяет, что мы не на продакшене
+2. **TransactionManager** — оборачивает всё в транзакцию
+3. **ScriptExecutor** — выполняет скрипты из `before_exec/`
 4. **SqlParser** / **StatementSplitter** — разбирает .sql файлы на отдельные выражения
 5. Выражения выполняются в БД
-6. **ScriptExecutor** — выполняет `after_exec/` скрипты
+6. **ScriptExecutor** — выполняет скрипты из `after_exec/`
 
-### Абстракция платформы
+### Различия платформ
 
-Пакет использует `DatabasePlatformInterface` для генерации SQL, совместимого с каждой СУБД:
+Пакет сам генерирует правильный SQL в зависимости от СУБД:
 
 | | PostgreSQL | MySQL |
 |---|---|---|
-| Идентификаторы | `"table"` (двойные кавычки) | `` `table` `` (обратные кавычки) |
+| Имена таблиц | `"table"` (двойные кавычки) | `` `table` `` (обратные кавычки) |
 | TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` |
-| Последовательности | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
+| Счётчики | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
 
-Платформа автоматически определяется из подключения к БД.
+Платформа определяется автоматически по подключению к БД.
 
-<a id="структура-каталогов-src"></a>
+<a id="структура-исходного-кода"></a>
 
-### Структура каталогов src/
+### Структура исходного кода
 
 ```
 src/
-├── Adapter/                          # Адаптеры БД
+├── Adapter/                          # Адаптеры подключений к БД
 │   ├── DoctrineDbalAdapter.php       #   Doctrine DBAL
 │   └── LaravelDatabaseAdapter.php    #   Laravel DB
 ├── Bridge/                           # Интеграции с фреймворками
@@ -471,23 +470,17 @@ src/
 │   │   └── LaravelLogger.php
 │   └── Symfony/
 │       ├── Command/                  #   Console-команды
-│       ├── DependencyInjection/      #   DI-расширение
+│       ├── DependencyInjection/
 │       ├── ConnectionRegistryFactory.php
 │       ├── ConsoleLogger.php
 │       └── DatabaseDumpsBundle.php
-├── Config/                           # DTO конфигурации
-│   ├── DumpConfig.php                #   Общая конфигурация дампов
-│   ├── EnvironmentConfig.php         #   Детекция окружения
+├── Config/                           # Классы конфигурации
+│   ├── DumpConfig.php                #   Общие настройки дампов
+│   ├── EnvironmentConfig.php         #   Определение окружения
 │   └── TableConfig.php              #   Настройки экспорта таблицы
 ├── Contract/                         # Интерфейсы
-│   ├── ConfigLoaderInterface.php
-│   ├── ConnectionRegistryInterface.php
-│   ├── DatabaseConnectionInterface.php
-│   ├── DatabasePlatformInterface.php
-│   ├── FileSystemInterface.php
-│   └── LoggerInterface.php
 ├── Exception/                        # Исключения
-├── Platform/                         # Абстракция SQL-диалектов
+├── Platform/                         # Поддержка SQL-диалектов
 │   ├── MySqlPlatform.php
 │   ├── PostgresPlatform.php
 │   └── PlatformFactory.php
@@ -497,16 +490,16 @@ src/
 │   ├── Dumper/                       # Экспорт дампов
 │   ├── Generator/                    # Генерация SQL
 │   ├── Importer/                     # Импорт дампов
-│   ├── Parser/                       # Парсинг SQL
-│   └── Security/                     # Защита продакшена
-└── Util/                             # Утилиты
+│   ├── Parser/                       # Разбор SQL
+│   └── Security/                     # Защита от продакшена
+└── Util/
     ├── FileSystemHelper.php
     └── YamlConfigLoader.php
 ```
 
 ## Безопасность
 
-Пакет включает защиту от случайного импорта в production-окружениях. Импорт блокируется, когда переменная окружения `APP_ENV` установлена в `prod` или `predprod`.
+Пакет не позволяет случайно импортировать дампы на продакшен. Импорт заблокирован, когда переменная окружения `APP_ENV` равна `prod` или `predprod`.
 
 ## Тестирование
 
@@ -514,7 +507,7 @@ src/
 # Все тесты
 composer test
 
-# Тесты с покрытием
+# Тесты с покрытием кода
 composer test-coverage
 
 # Статический анализ (PHPStan level 8)
@@ -526,7 +519,7 @@ composer cs-fix
 
 ## Локальная разработка
 
-Для тестирования пакета в локальном проекте без Packagist добавьте в `composer.json` проекта:
+Чтобы подключить пакет из локальной папки (без Packagist), добавьте в `composer.json` вашего проекта:
 
 ```json
 {
@@ -542,7 +535,7 @@ composer cs-fix
 }
 ```
 
-Затем выполните `composer update backvista/database-dumps`. Composer создаст симлинк на локальный пакет.
+Затем выполните `composer update backvista/database-dumps` — Composer создаст симлинк на локальный пакет.
 
 ## Требования
 
@@ -552,9 +545,9 @@ composer cs-fix
 - `symfony/yaml` ^5.4 | ^6.0 | ^7.0
 - `symfony/finder` ^5.4 | ^6.0 | ^7.0
 
-**Опциональные (в зависимости от фреймворка):**
+**Опциональные (зависят от фреймворка):**
 
-| Зависимость | Назначение |
+| Зависимость | Для чего нужна |
 |---|---|
 | `doctrine/dbal` ^2.13 \| ^3.0 \| ^4.0 | Адаптер Doctrine DBAL (Symfony) |
 | `symfony/console` ^5.4 \| ^6.0 \| ^7.0 | Консольные команды Symfony |
@@ -573,7 +566,7 @@ MIT License. Подробнее в файле [LICENSE](LICENSE).
 
 # English
 
-Framework-agnostic PHP package for managing database dumps — SQL export/import supporting PostgreSQL and MySQL.
+PHP package for exporting and importing database dumps as SQL. Supports PostgreSQL and MySQL. Works with Symfony, Laravel, and any PHP project.
 
 ## Table of Contents
 
@@ -583,11 +576,10 @@ Framework-agnostic PHP package for managing database dumps — SQL export/import
   - [Symfony](#quick-start-symfony)
   - [Laravel](#quick-start-laravel)
 - [Configuration](#configuration)
-  - [YAML Format](#yaml-format)
-    - [Full Export](#full-export)
-    - [Partial Export](#partial-export)
+  - [Full Export](#full-export)
+  - [Partial Export](#partial-export)
   - [Multiple Connections](#multiple-connections)
-  - [Auto-generate Configuration (prepare-config)](#auto-generate-configuration-prepare-config)
+  - [Auto-generate Configuration](#auto-generate-configuration)
 - [Symfony Setup](#symfony-setup)
   - [Bundle Registration](#bundle-registration)
   - [Directory Structure (Symfony)](#directory-structure-symfony)
@@ -599,9 +591,9 @@ Framework-agnostic PHP package for managing database dumps — SQL export/import
 - [Before/After Scripts](#beforeafter-scripts)
 - [IDE Support (JSON Schema)](#ide-support-json-schema)
 - [Architecture](#architecture)
-  - [Export Flow](#export-flow)
-  - [Import Flow](#import-flow)
-  - [Platform Abstraction](#platform-abstraction)
+  - [How Export Works](#how-export-works)
+  - [How Import Works](#how-import-works)
+  - [Platform Differences](#platform-differences)
   - [Source Directory Structure](#source-directory-structure)
 - [Security](#security)
 - [Testing](#testing)
@@ -613,16 +605,16 @@ Framework-agnostic PHP package for managing database dumps — SQL export/import
 
 ## Features
 
-- **Framework-agnostic** — works with Symfony, Laravel, and any PHP project
-- **PostgreSQL & MySQL** — SQL dialect abstraction via platforms
-- **Multiple connections** — export/import across multiple databases simultaneously
-- **Smart batching** — automatic INSERT batching (1000 rows per statement)
-- **Transaction safety** — automatic rollback on errors
-- **Production guard** — prevents accidental imports in production environments
-- **Before/After hooks** — custom SQL scripts before and after import
-- **Flexible configuration** — YAML-based rules for full and partial exports
-- **Sequence reset** — automatic sequence/auto-increment reset
-- **Auto-generate config** — `prepare-config` command creates YAML based on DB structure
+- **No framework lock-in** — works with Symfony, Laravel, and any PHP project
+- **PostgreSQL & MySQL** — automatically generates the right SQL for each database
+- **Multiple connections** — export/import from several databases at once
+- **Batched INSERTs** — automatically groups rows (1000 per statement)
+- **Rollback on errors** — import runs inside a transaction
+- **Production guard** — import is blocked when `APP_ENV=prod`
+- **Before/After scripts** — run custom SQL before and after import
+- **Flexible config** — YAML file with full and partial export rules
+- **Sequence reset** — automatic sequence / auto-increment reset after import
+- **Auto-generate config** — `prepare-config` command creates YAML from DB structure
 
 ## Installation
 
@@ -638,7 +630,7 @@ composer require backvista/database-dumps
 
 ### Symfony
 
-1. The bundle is auto-registered via Symfony Flex.
+1. The bundle registers automatically via Symfony Flex.
 
 2. Create `config/dump_config.yaml`:
 
@@ -655,13 +647,13 @@ partial_export:
       order_by: created_at DESC
 ```
 
-3. Export:
+3. Export dumps:
 
 ```bash
 php bin/console app:dbdump:export all
 ```
 
-4. Import:
+4. Import dumps:
 
 ```bash
 php bin/console app:dbdump:import
@@ -671,17 +663,17 @@ php bin/console app:dbdump:import
 
 ### Laravel
 
-1. The service provider is auto-discovered. The file `database/dump_config.yaml` is created on first run.
+1. The service provider is discovered automatically. The file `database/dump_config.yaml` is created on first run.
 
 2. Edit `database/dump_config.yaml` (same format as Symfony).
 
-3. Export:
+3. Export dumps:
 
 ```bash
 php artisan dbdump:export all
 ```
 
-4. Import:
+4. Import dumps:
 
 ```bash
 php artisan dbdump:import
@@ -689,11 +681,11 @@ php artisan dbdump:import
 
 ## Configuration
 
-### YAML Format
+Export is configured via a YAML file with two sections: `full_export` (all rows) and `partial_export` (with limits).
 
 #### Full Export
 
-Export **all rows** from specified tables:
+Exports **all rows** from listed tables:
 
 ```yaml
 full_export:
@@ -706,7 +698,7 @@ full_export:
 
 #### Partial Export
 
-Export a **limited number of rows** with filtering:
+Exports a **limited number of rows** with filtering:
 
 ```yaml
 partial_export:
@@ -714,7 +706,7 @@ partial_export:
     clients:
       limit: 1000                    # max rows
       order_by: created_at DESC      # sorting
-      where: "is_active = true"      # WHERE filter
+      where: "is_active = true"      # WHERE condition
     orders:
       limit: 5000
       order_by: id DESC
@@ -724,16 +716,16 @@ partial_export:
 
 | Option | Description |
 |--------|-------------|
-| `limit` | Maximum number of rows to export |
-| `order_by` | SQL ORDER BY clause (must end with `ASC` or `DESC`) |
-| `where` | SQL WHERE condition |
+| `limit` | Max rows |
+| `order_by` | Sorting (must end with `ASC` or `DESC`) |
+| `where` | WHERE condition |
 
 ### Multiple Connections
 
-To work with multiple databases, add a `connections` section:
+To work with several databases, add a `connections` section:
 
 ```yaml
-# Default connection configuration
+# Main connection
 full_export:
   public:
     - users
@@ -746,7 +738,7 @@ partial_export:
 
 # Additional connections
 connections:
-  analytics:                 # connection name (matches framework config)
+  analytics:                 # connection name (as in framework config)
     full_export:
       analytics:
         - events
@@ -758,26 +750,26 @@ connections:
           order_by: id DESC
 ```
 
-**Dump paths:**
-- Default connection: `database/dumps/{schema}/{table}.sql`
+**Where dumps are saved:**
+- Main connection: `database/dumps/{schema}/{table}.sql`
 - Named connection: `database/dumps/{connection}/{schema}/{table}.sql`
 
-**Usage with `--connection` option:**
+**The `--connection` option:**
 
 ```bash
-# Export from default connection only (no option)
+# Main connection only (default)
 php artisan dbdump:export all
 
-# Export from a specific connection
+# Specific connection only
 php artisan dbdump:export all --connection=analytics
 
-# Export from all connections
+# All connections at once
 php artisan dbdump:export all --connection=all
 ```
 
-### Auto-generate Configuration (prepare-config)
+### Auto-generate Configuration
 
-The `prepare-config` command analyzes the DB structure and generates `dump_config.yaml` automatically:
+The `prepare-config` command looks at your DB structure and creates `dump_config.yaml` for you:
 
 ```bash
 # Symfony
@@ -791,12 +783,12 @@ php artisan dbdump:prepare-config
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--threshold`, `-t` | Row threshold: tables <= threshold go to full_export, above — to partial_export | 500 |
-| `--force`, `-f` | Overwrite existing file without confirmation | — |
+| `--threshold`, `-t` | Row threshold: tables with rows <= threshold go to full_export, more — to partial_export | 500 |
+| `--force`, `-f` | Overwrite file without asking | — |
 
-**Distribution logic:**
-- Rows <= `threshold` — `full_export` (all rows)
-- Rows > `threshold` — `partial_export` (with limit and auto-detected sorting)
+**How tables are sorted:**
+- Rows <= threshold — `full_export`
+- Rows > threshold — `partial_export` (with limit and auto-detected sorting)
 - Empty tables — skipped
 - Service tables (migrations, sessions, cache_*, telescope_*, oauth_*, audit_*) — skipped
 
@@ -804,7 +796,7 @@ php artisan dbdump:prepare-config
 
 ### Bundle Registration
 
-The bundle is auto-registered via Symfony Flex. If not, add to `config/bundles.php`:
+The bundle registers automatically via Symfony Flex. If not, add to `config/bundles.php`:
 
 ```php
 return [
@@ -813,7 +805,7 @@ return [
 ];
 ```
 
-Set the platform parameter in `services.yaml`:
+Set the platform in `services.yaml`:
 
 ```yaml
 parameters:
@@ -827,7 +819,7 @@ parameters:
 ```
 your-symfony-project/
 ├── config/
-│   └── dump_config.yaml          # export configuration
+│   └── dump_config.yaml          # export settings
 ├── database/
 │   ├── before_exec/              # pre-import scripts
 │   │   └── 01_prepare.sql
@@ -848,13 +840,13 @@ your-symfony-project/
 # Export all tables
 php bin/console app:dbdump:export all
 
-# Export a specific table
+# Export one table
 php bin/console app:dbdump:export public.users
 
-# Export with schema filter
+# Export from one schema only
 php bin/console app:dbdump:export all --schema=public
 
-# Export with connection
+# Export from a specific connection
 php bin/console app:dbdump:export all --connection=analytics
 php bin/console app:dbdump:export all --connection=all
 
@@ -866,7 +858,7 @@ php bin/console app:dbdump:import --skip-before --skip-after
 php bin/console app:dbdump:import --schema=public
 php bin/console app:dbdump:import --connection=all
 
-# Auto-generate configuration
+# Generate config from DB structure
 php bin/console app:dbdump:prepare-config
 php bin/console app:dbdump:prepare-config --threshold=1000 --force
 ```
@@ -875,7 +867,7 @@ php bin/console app:dbdump:prepare-config --threshold=1000 --force
 
 ### Provider Registration
 
-The service provider is auto-discovered. If not, register manually in `config/app.php`:
+The service provider is discovered automatically. If not, register it in `config/app.php`:
 
 ```php
 'providers' => [
@@ -907,13 +899,13 @@ return [
 # Export all tables
 php artisan dbdump:export all
 
-# Export a specific table
+# Export one table
 php artisan dbdump:export public.users
 
-# Export with schema filter
+# Export from one schema only
 php artisan dbdump:export all --schema=public
 
-# Export with connection
+# Export from a specific connection
 php artisan dbdump:export all --connection=analytics
 php artisan dbdump:export all --connection=all
 
@@ -925,21 +917,21 @@ php artisan dbdump:import --skip-before --skip-after
 php artisan dbdump:import --schema=public
 php artisan dbdump:import --connection=all
 
-# Auto-generate configuration
+# Generate config from DB structure
 php artisan dbdump:prepare-config
 php artisan dbdump:prepare-config --threshold=1000 --force
 ```
 
 ## Before/After Scripts
 
-Execute custom SQL scripts before and after import.
+You can run custom SQL scripts before and after import.
 
-| Directory | Execution time |
-|-----------|---------------|
+| Directory | When it runs |
+|-----------|-------------|
 | `database/before_exec/` | **before** importing dumps |
 | `database/after_exec/` | **after** importing dumps |
 
-Scripts are executed in **alphabetical order**. Use numeric prefixes to control the order:
+Scripts run in **alphabetical order**. Use numeric prefixes to control the order:
 
 ```
 database/before_exec/
@@ -950,7 +942,7 @@ database/after_exec/
 ├── 02_refresh_views.sql
 ```
 
-To skip scripts, use the `--skip-before` and `--skip-after` options:
+To skip scripts, use `--skip-before` and `--skip-after`:
 
 ```bash
 php artisan dbdump:import --skip-before
@@ -960,69 +952,71 @@ php artisan dbdump:import --skip-before --skip-after
 
 ## IDE Support (JSON Schema)
 
-The package includes a JSON Schema for `dump_config.yaml` at `resources/dump_config.schema.json`. This provides autocompletion, validation, and documentation hints in PHPStorm and other IDEs.
+The package includes a JSON Schema for `dump_config.yaml` at `resources/dump_config.schema.json`. It provides autocompletion and validation in PHPStorm and other IDEs.
 
 ### Option 1: YAML comment (recommended)
 
-Add this line at the top of your `dump_config.yaml`:
+Add to the top of your `dump_config.yaml`:
 
 ```yaml
 # yaml-language-server: $schema=../vendor/backvista/database-dumps/resources/dump_config.schema.json
 ```
 
-> For Symfony the path is relative to `config/`, for Laravel — relative to `database/`.
+> The path is relative to the file: for Symfony — relative to `config/`, for Laravel — relative to `database/`.
 
-### Option 2: PHPStorm manual mapping
+### Option 2: PHPStorm manual setup
 
 1. Open **Settings > Languages & Frameworks > Schemas and DTDs > JSON Schema Mappings**
-2. Add a new mapping:
+2. Add a mapping:
    - **Schema file**: `vendor/backvista/database-dumps/resources/dump_config.schema.json`
    - **File path pattern**: `dump_config.yaml`
 
 ## Architecture
 
-### Export Flow
+### How Export Works
 
 ```
 Command → TableConfigResolver → DatabaseDumper → DataFetcher → SqlGenerator → .sql files
 ```
 
-1. **TableConfigResolver** — resolves YAML config into `TableConfig[]` array
-2. **DatabaseDumper** — orchestrates the export process
-3. **DataFetcher** — fetches data from DB via `ConnectionRegistry`
-4. **SqlGenerator** — generates SQL (TRUNCATE + INSERT + sequence reset)
-5. Result is written to `database/dumps/{schema}/{table}.sql`
+1. **TableConfigResolver** — reads YAML and builds a list of tables to export
+2. **DatabaseDumper** — manages the export process
+3. **DataFetcher** — fetches data from the DB via `ConnectionRegistry`
+4. **SqlGenerator** — generates SQL: TRUNCATE + INSERT + counter reset
+5. Result is saved to `database/dumps/{schema}/{table}.sql`
 
-### Import Flow
+### How Import Works
 
 ```
 Command → DatabaseImporter → ProductionGuard → TransactionManager → ScriptExecutor → SqlParser → execution
 ```
 
-1. **ProductionGuard** — blocks import in production
-2. **TransactionManager** — wraps operations in a transaction
-3. **ScriptExecutor** — runs `before_exec/` scripts
-4. **SqlParser** / **StatementSplitter** — parses .sql files into individual statements
+1. **ProductionGuard** — checks we're not on production
+2. **TransactionManager** — wraps everything in a transaction
+3. **ScriptExecutor** — runs scripts from `before_exec/`
+4. **SqlParser** / **StatementSplitter** — splits .sql files into individual statements
 5. Statements are executed against the DB
-6. **ScriptExecutor** — runs `after_exec/` scripts
+6. **ScriptExecutor** — runs scripts from `after_exec/`
 
-### Platform Abstraction
+### Platform Differences
 
-The package uses `DatabasePlatformInterface` to generate SQL compatible with each DBMS:
+The package generates the right SQL depending on the database:
 
 | | PostgreSQL | MySQL |
 |---|---|---|
-| Identifiers | `"table"` (double quotes) | `` `table` `` (backticks) |
+| Table names | `"table"` (double quotes) | `` `table` `` (backticks) |
 | TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` |
-| Sequences | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
+| Counters | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
 
-The platform is automatically detected from the database connection.
+The platform is detected automatically from the DB connection.
+
+<a id="source-directory-structure"></a>
 
 ### Source Directory Structure
 
 ```
 src/
-├── Adapter/                          # DB adapters
+├── Adapter/                          # DB connection adapters
 │   ├── DoctrineDbalAdapter.php       #   Doctrine DBAL
 │   └── LaravelDatabaseAdapter.php    #   Laravel DB
 ├── Bridge/                           # Framework integrations
@@ -1032,23 +1026,17 @@ src/
 │   │   └── LaravelLogger.php
 │   └── Symfony/
 │       ├── Command/                  #   Console commands
-│       ├── DependencyInjection/      #   DI extension
+│       ├── DependencyInjection/
 │       ├── ConnectionRegistryFactory.php
 │       ├── ConsoleLogger.php
 │       └── DatabaseDumpsBundle.php
-├── Config/                           # Configuration DTOs
-│   ├── DumpConfig.php                #   Overall dump configuration
+├── Config/                           # Configuration classes
+│   ├── DumpConfig.php                #   Overall dump settings
 │   ├── EnvironmentConfig.php         #   Environment detection
 │   └── TableConfig.php              #   Per-table export settings
 ├── Contract/                         # Interfaces
-│   ├── ConfigLoaderInterface.php
-│   ├── ConnectionRegistryInterface.php
-│   ├── DatabaseConnectionInterface.php
-│   ├── DatabasePlatformInterface.php
-│   ├── FileSystemInterface.php
-│   └── LoggerInterface.php
 ├── Exception/                        # Exceptions
-├── Platform/                         # SQL dialect abstraction
+├── Platform/                         # SQL dialect support
 │   ├── MySqlPlatform.php
 │   ├── PostgresPlatform.php
 │   └── PlatformFactory.php
@@ -1060,14 +1048,14 @@ src/
 │   ├── Importer/                     # Dump import
 │   ├── Parser/                       # SQL parsing
 │   └── Security/                     # Production guard
-└── Util/                             # Utilities
+└── Util/
     ├── FileSystemHelper.php
     └── YamlConfigLoader.php
 ```
 
 ## Security
 
-The package includes a production guard that prevents accidental database imports in production environments. Import is blocked when the `APP_ENV` environment variable is set to `prod` or `predprod`.
+The package prevents accidental imports on production. Import is blocked when the `APP_ENV` environment variable is `prod` or `predprod`.
 
 ## Testing
 
@@ -1075,7 +1063,7 @@ The package includes a production guard that prevents accidental database import
 # All tests
 composer test
 
-# Tests with coverage
+# Tests with code coverage
 composer test-coverage
 
 # Static analysis (PHPStan level 8)
@@ -1087,7 +1075,7 @@ composer cs-fix
 
 ## Local Development
 
-To test the package in a local project without Packagist, add to the project's `composer.json`:
+To use the package from a local folder (without Packagist), add to your project's `composer.json`:
 
 ```json
 {
@@ -1103,7 +1091,7 @@ To test the package in a local project without Packagist, add to the project's `
 }
 ```
 
-Then run `composer update backvista/database-dumps`. Composer will create a symlink to the local package.
+Then run `composer update backvista/database-dumps` — Composer will create a symlink to the local package.
 
 ## Requirements
 
@@ -1113,16 +1101,16 @@ Then run `composer update backvista/database-dumps`. Composer will create a syml
 - `symfony/yaml` ^5.4 | ^6.0 | ^7.0
 - `symfony/finder` ^5.4 | ^6.0 | ^7.0
 
-**Optional (depending on framework):**
+**Optional (depends on framework):**
 
-| Dependency | Required for |
+| Dependency | What it's for |
 |---|---|
 | `doctrine/dbal` ^2.13 \| ^3.0 \| ^4.0 | Doctrine DBAL adapter (Symfony) |
 | `symfony/console` ^5.4 \| ^6.0 \| ^7.0 | Symfony console commands |
 | `symfony/http-kernel` ^5.4 \| ^6.0 \| ^7.0 | Symfony bundle registration |
 | `illuminate/support` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel service provider |
 | `illuminate/console` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel artisan commands |
-| `illuminate/database` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel database adapter |
+| `illuminate/database` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel DB adapter |
 
 ## License
 
