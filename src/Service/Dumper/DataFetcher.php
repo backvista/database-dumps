@@ -2,6 +2,7 @@
 
 namespace BackVista\DatabaseDumps\Service\Dumper;
 
+use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
@@ -13,9 +14,20 @@ class DataFetcher
     /** @var ConnectionRegistryInterface */
     private $registry;
 
-    public function __construct(ConnectionRegistryInterface $registry)
-    {
+    /** @var CascadeWhereResolver */
+    private $cascadeResolver;
+
+    /** @var DumpConfig */
+    private $dumpConfig;
+
+    public function __construct(
+        ConnectionRegistryInterface $registry,
+        CascadeWhereResolver $cascadeResolver,
+        DumpConfig $dumpConfig
+    ) {
         $this->registry = $registry;
+        $this->cascadeResolver = $cascadeResolver;
+        $this->dumpConfig = $dumpConfig;
     }
 
     /**
@@ -32,8 +44,20 @@ class DataFetcher
         $fullTable = $platform->getFullTableName($config->getSchema(), $config->getTable());
         $sql = "SELECT * FROM {$fullTable}";
 
-        if ($config->getWhere()) {
-            $sql .= " WHERE {$config->getWhere()}";
+        // Resolve cascade WHERE if configured
+        $cascadeWhere = null;
+        if ($config->getCascadeFrom() !== null) {
+            $cascadeWhere = $this->cascadeResolver->resolve($config, $this->dumpConfig);
+        }
+
+        // Build WHERE clause
+        $existingWhere = $config->getWhere();
+        if ($existingWhere !== null && $cascadeWhere !== null) {
+            $sql .= " WHERE ({$existingWhere}) AND ({$cascadeWhere})";
+        } elseif ($cascadeWhere !== null) {
+            $sql .= " WHERE {$cascadeWhere}";
+        } elseif ($existingWhere !== null) {
+            $sql .= " WHERE {$existingWhere}";
         }
 
         if ($config->getOrderBy()) {

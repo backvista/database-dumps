@@ -3,16 +3,21 @@
 namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 
 use PHPUnit\Framework\TestCase;
+use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
+use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
 
 class DataFetcherTest extends TestCase
 {
     /** @var DatabaseConnectionInterface&\PHPUnit\Framework\MockObject\MockObject */
     private $connection;
+
+    /** @var CascadeWhereResolver&\PHPUnit\Framework\MockObject\MockObject */
+    private $cascadeResolver;
 
     /** @var DataFetcher */
     private $fetcher;
@@ -26,7 +31,12 @@ class DataFetcherTest extends TestCase
         $registry->method('getConnection')->willReturn($this->connection);
         $registry->method('getPlatform')->willReturn($platform);
 
-        $this->fetcher = new DataFetcher($registry);
+        $this->cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $this->cascadeResolver->method('resolve')->willReturn(null);
+
+        $dumpConfig = new DumpConfig([], []);
+
+        $this->fetcher = new DataFetcher($registry, $this->cascadeResolver, $dumpConfig);
     }
 
     public function testFetchFullExport(): void
@@ -108,5 +118,97 @@ class DataFetcherTest extends TestCase
             ->willReturn([]);
 
         $this->fetcher->fetch($config);
+    }
+
+    public function testFetchWithCascadeWhere(): void
+    {
+        $cascadeFrom = [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ];
+        $config = new TableConfig('public', 'orders', null, null, null, null, $cascadeFrom);
+
+        $cascadeWhereValue = 'user_id IN (SELECT "id" FROM "public"."users" WHERE active=true)';
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn($cascadeWhereValue);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $dumpConfig = new DumpConfig([], []);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, $dumpConfig);
+
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->stringContains($cascadeWhereValue))
+            ->willReturn([]);
+
+        $fetcher->fetch($config);
+    }
+
+    public function testFetchWithCascadeWhereAndExistingWhere(): void
+    {
+        $cascadeFrom = [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ];
+        $config = new TableConfig('public', 'orders', null, 'status = 1', null, null, $cascadeFrom);
+
+        $cascadeWhereValue = 'user_id IN (SELECT "id" FROM "public"."users" WHERE active=true)';
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn($cascadeWhereValue);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $dumpConfig = new DumpConfig([], []);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, $dumpConfig);
+
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('WHERE (status = 1) AND (' . $cascadeWhereValue . ')'),
+                $this->stringContains('SELECT * FROM "public"."orders"')
+            ))
+            ->willReturn([]);
+
+        $fetcher->fetch($config);
+    }
+
+    public function testFetchWithCascadeFromReturningNull(): void
+    {
+        $cascadeFrom = [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ];
+        $config = new TableConfig('public', 'orders', null, 'status = 1', null, null, $cascadeFrom);
+
+        // cascadeResolver returns null (parent is full export)
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($this->connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $dumpConfig = new DumpConfig([], []);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, $dumpConfig);
+
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('WHERE status = 1'),
+                $this->logicalNot($this->stringContains('AND'))
+            ))
+            ->willReturn([]);
+
+        $fetcher->fetch($config);
     }
 }

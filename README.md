@@ -24,6 +24,9 @@ PHP-пакет для экспорта и импорта дампов баз д�
 - [Конфигурация](#конфигурация)
   - [Полный экспорт (full_export)](#полный-экспорт-full_export)
   - [Частичный экспорт (partial_export)](#частичный-экспорт-partial_export)
+  - [Каскадные зависимости (cascade_from)](#каскадные-зависимости-cascade_from)
+  - [Замена персональных данных (faker)](#замена-персональных-данных-faker)
+  - [Разделение конфига по схемам (includes)](#разделение-конфига-по-схемам-includes)
   - [Несколько подключений](#несколько-подключений)
   - [Автогенерация конфигурации](#автогенерация-конфигурации)
 - [Настройка Symfony](#настройка-symfony)
@@ -61,6 +64,10 @@ PHP-пакет для экспорта и импорта дампов баз д�
 - **Гибкая настройка** — YAML-файл с правилами полного и частичного экспорта
 - **Сброс счётчиков** — автоматический сброс sequence / auto-increment после импорта
 - **Автогенерация конфига** — команда `prepare-config` создаёт YAML по структуре БД
+- **FK-сортировка** — автоматическая топологическая сортировка таблиц при экспорте и импорте (родители первыми)
+- **Каскадные зависимости** — `cascade_from` генерирует WHERE-подзапросы для связности данных через FK
+- **Замена ПД (faker)** — автоматическое обнаружение и замена персональных данных (ФИО, email, телефон) при экспорте
+- **Разделение конфига** — автоматическое разбиение конфигурации на отдельные файлы по схемам
 
 ## Установка
 
@@ -163,6 +170,116 @@ partial_export:
 | `limit` | Максимум строк |
 | `order_by` | Сортировка (должна заканчиваться на `ASC` или `DESC`) |
 | `where` | Условие WHERE |
+| `cascade_from` | Каскадная фильтрация по FK-родителю (см. ниже) |
+
+### Каскадные зависимости (cascade_from)
+
+При частичном экспорте связанных таблиц данные могут стать несогласованными: дочерняя таблица может ссылаться на строки, которые не попали в дамп родителя. Опция `cascade_from` решает эту проблему — она автоматически генерирует WHERE-подзапрос, ограничивающий выборку только теми строками, чей FK-родитель присутствует в дампе.
+
+```yaml
+partial_export:
+  public:
+    users:
+      limit: 500
+      order_by: id DESC
+    orders:
+      limit: 1000
+      order_by: created_at DESC
+      cascade_from:
+        - parent: public.users
+          fk_column: user_id
+          parent_column: id
+    order_items:
+      limit: 5000
+      order_by: id DESC
+      cascade_from:
+        - parent: public.orders
+          fk_column: order_id
+          parent_column: id
+```
+
+В этом примере:
+- `orders` экспортирует только те заказы, чей `user_id` есть среди экспортированных `users`
+- `order_items` экспортирует только позиции заказов, попавших в дамп `orders`
+- Подзапросы вложенные: `order_items` → `orders` → `users` (глубина до 10 уровней)
+
+Команда `prepare-config` автоматически определяет FK-зависимости и генерирует `cascade_from`. Чтобы отключить: `--no-cascade`.
+
+### Замена персональных данных (faker)
+
+Пакет может автоматически обнаруживать и заменять персональные данные при экспорте. Это позволяет безопасно использовать дампы в dev/staging окружениях.
+
+**Поддерживаемые паттерны:**
+
+| Паттерн | Описание | Пример оригинала | Пример замены |
+|---------|----------|------------------|---------------|
+| `fio` | ФИО полностью | Иванов Иван Иванович | Петров Александр Сергеевич |
+| `fio_short` | ФИО сокращённо | Иванов И.И. | Козлов А.В. |
+| `email` | Email | ivan@company.ru | aleksandr.petrov42@example.com |
+| `phone` | Телефон | +79161234567 | 79234567890 |
+
+**Секция `faker` в конфигурации:**
+
+```yaml
+faker:
+  public:
+    users:
+      full_name: fio
+      email: email
+      phone: phone
+    employees:
+      fio: fio
+      short_fio: fio_short
+      contact_email: email
+```
+
+Команда `prepare-config` автоматически анализирует содержимое таблиц и генерирует секцию `faker`, если в колонках обнаруживаются паттерны ПД (порог совпадения: 80% из 200 случайных строк). Чтобы отключить: `--no-faker`.
+
+Замена детерминирована — одна и та же таблица всегда даёт одинаковый результат (seed основан на имени таблицы и первой строке данных).
+
+### Разделение конфига по схемам (includes)
+
+При большом количестве таблиц конфигурация может стать громоздкой. Команда `prepare-config` по умолчанию разбивает конфиг на отдельные файлы по схемам:
+
+```
+config/
+├── dump_config.yaml          # главный файл с includes
+├── public.yaml               # конфигурация схемы public
+├── system.yaml               # конфигурация схемы system
+└── analytics/                # именованное подключение
+    └── analytics.yaml
+```
+
+**Главный файл (`dump_config.yaml`):**
+
+```yaml
+includes:
+  public: public.yaml
+  system: system.yaml
+
+connections:
+  analytics:
+    includes:
+      analytics: analytics/analytics.yaml
+```
+
+**Файл схемы (`public.yaml`):**
+
+```yaml
+full_export:
+  - users
+  - roles
+partial_export:
+  clients:
+    limit: 1000
+    order_by: created_at DESC
+faker:
+  users:
+    full_name: fio
+    email: email
+```
+
+Чтобы генерировать единый файл без разделения: `--no-split`.
 
 ### Несколько подключений
 
@@ -229,6 +346,9 @@ php artisan dbdump:prepare-config
 |-------|----------|-------------|
 | `--threshold`, `-t` | Порог строк: таблицы с количеством строк <= порога идут в full_export, больше — в partial_export | 500 |
 | `--force`, `-f` | Перезаписать файл без подтверждения | — |
+| `--no-cascade` | Пропустить обнаружение FK и генерацию `cascade_from` | — |
+| `--no-faker` | Пропустить обнаружение персональных данных | — |
+| `--no-split` | Генерировать единый YAML без разделения по схемам | — |
 
 **Как распределяются таблицы:**
 - Строк <= порога — `full_export`
@@ -302,9 +422,13 @@ php bin/console app:dbdump:import --skip-before --skip-after
 php bin/console app:dbdump:import --schema=public
 php bin/console app:dbdump:import --connection=all
 
+# Экспорт без каскадной фильтрации и без замены ПД
+php bin/console app:dbdump:export all --no-cascade --no-faker
+
 # Сгенерировать конфигурацию по структуре БД
 php bin/console app:dbdump:prepare-config
 php bin/console app:dbdump:prepare-config --threshold=1000 --force
+php bin/console app:dbdump:prepare-config --no-cascade --no-faker --no-split
 ```
 
 ## Настройка Laravel
@@ -361,9 +485,13 @@ php artisan dbdump:import --skip-before --skip-after
 php artisan dbdump:import --schema=public
 php artisan dbdump:import --connection=all
 
+# Экспорт без каскадной фильтрации и без замены ПД
+php artisan dbdump:export all --no-cascade --no-faker
+
 # Сгенерировать конфигурацию по структуре БД
 php artisan dbdump:prepare-config
 php artisan dbdump:prepare-config --threshold=1000 --force
+php artisan dbdump:prepare-config --no-cascade --no-faker --no-split
 ```
 
 ## Скрипты before/after
@@ -420,27 +548,31 @@ php artisan dbdump:import --skip-before --skip-after
 ### Как работает экспорт
 
 ```
-Команда → TableConfigResolver → DatabaseDumper → DataFetcher → SqlGenerator → .sql файлы
+Команда → TableConfigResolver → DatabaseDumper → [FK-сортировка] → DataFetcher → [Cascade WHERE] → [Faker] → SqlGenerator → .sql файлы
 ```
 
 1. **TableConfigResolver** — читает YAML и собирает список таблиц для экспорта
 2. **DatabaseDumper** — управляет процессом экспорта
-3. **DataFetcher** — получает данные из БД через `ConnectionRegistry`
-4. **SqlGenerator** — генерирует SQL: TRUNCATE + INSERT + сброс счётчиков
-5. Результат сохраняется в `database/dumps/{schema}/{table}.sql`
+3. **TableDependencyResolver** — топологическая сортировка таблиц по FK (родители экспортируются первыми)
+4. **DataFetcher** — получает данные из БД через `ConnectionRegistry`
+5. **CascadeWhereResolver** — генерирует WHERE-подзапросы из `cascade_from` для связности данных
+6. **RussianFaker** — заменяет персональные данные (ФИО, email, телефон) на сгенерированные
+7. **SqlGenerator** — генерирует SQL: TRUNCATE + INSERT + сброс счётчиков
+8. Результат сохраняется в `database/dumps/{schema}/{table}.sql`
 
 ### Как работает импорт
 
 ```
-Команда → DatabaseImporter → ProductionGuard → TransactionManager → ScriptExecutor → SqlParser → выполнение
+Команда → DatabaseImporter → ProductionGuard → TransactionManager → [FK-сортировка] → ScriptExecutor → SqlParser → выполнение
 ```
 
 1. **ProductionGuard** — проверяет, что мы не на продакшене
 2. **TransactionManager** — оборачивает всё в транзакцию
-3. **ScriptExecutor** — выполняет скрипты из `before_exec/`
-4. **SqlParser** / **StatementSplitter** — разбирает .sql файлы на отдельные выражения
-5. Выражения выполняются в БД
-6. **ScriptExecutor** — выполняет скрипты из `after_exec/`
+3. **TableDependencyResolver** — топологическая сортировка файлов по FK (родители импортируются первыми)
+4. **ScriptExecutor** — выполняет скрипты из `before_exec/`
+5. **SqlParser** / **StatementSplitter** — разбирает .sql файлы на отдельные выражения
+6. Выражения выполняются в БД
+7. **ScriptExecutor** — выполняет скрипты из `after_exec/`
 
 ### Различия платформ
 
@@ -477,6 +609,7 @@ src/
 ├── Config/                           # Классы конфигурации
 │   ├── DumpConfig.php                #   Общие настройки дампов
 │   ├── EnvironmentConfig.php         #   Определение окружения
+│   ├── FakerConfig.php               #   Настройки замены ПД
 │   └── TableConfig.php              #   Настройки экспорта таблицы
 ├── Contract/                         # Интерфейсы
 ├── Exception/                        # Исключения
@@ -486,9 +619,21 @@ src/
 │   └── PlatformFactory.php
 ├── Service/
 │   ├── ConfigGenerator/              # Автогенерация конфигурации
+│   │   ├── ConfigGenerator.php       #   Генератор dump_config.yaml
+│   │   ├── ConfigSplitter.php        #   Разделение на per-schema файлы
+│   │   └── ForeignKeyInspector.php   #   Инспекция FK из information_schema
 │   ├── ConnectionRegistry.php        # Реестр подключений
 │   ├── Dumper/                       # Экспорт дампов
+│   │   ├── CascadeWhereResolver.php  #   Рекурсивная резолюция cascade WHERE
+│   │   ├── DatabaseDumper.php        #   Основной экспортёр
+│   │   └── DataFetcher.php           #   Загрузка данных из таблицы
+│   ├── Faker/                        # Замена персональных данных
+│   │   ├── PatternDetector.php       #   Автодетекция паттернов ПД
+│   │   └── RussianFaker.php          #   Генератор русских ФИО/email/телефонов
 │   ├── Generator/                    # Генерация SQL
+│   ├── Graph/                        # Граф FK-зависимостей
+│   │   ├── TableDependencyResolver.php #  FK-граф + топологическая сортировка
+│   │   └── TopologicalSorter.php     #   Алгоритм Kahn (BFS) + Tarjan (SCC)
 │   ├── Importer/                     # Импорт дампов
 │   ├── Parser/                       # Разбор SQL
 │   └── Security/                     # Защита от продакшена
@@ -578,6 +723,9 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 - [Configuration](#configuration)
   - [Full Export](#full-export)
   - [Partial Export](#partial-export)
+  - [Cascade Dependencies (cascade_from)](#cascade-dependencies-cascade_from)
+  - [Personal Data Masking (faker)](#personal-data-masking-faker)
+  - [Config Splitting by Schema (includes)](#config-splitting-by-schema-includes)
   - [Multiple Connections](#multiple-connections)
   - [Auto-generate Configuration](#auto-generate-configuration)
 - [Symfony Setup](#symfony-setup)
@@ -615,6 +763,10 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 - **Flexible config** — YAML file with full and partial export rules
 - **Sequence reset** — automatic sequence / auto-increment reset after import
 - **Auto-generate config** — `prepare-config` command creates YAML from DB structure
+- **FK-aware ordering** — automatic topological sorting of tables during export and import (parents first)
+- **Cascade dependencies** — `cascade_from` generates WHERE subqueries to keep data consistent across FK relations
+- **Personal data masking (faker)** — automatic detection and replacement of PII (Russian names, email, phone) during export
+- **Config splitting** — automatic splitting of configuration into per-schema files
 
 ## Installation
 
@@ -719,6 +871,116 @@ partial_export:
 | `limit` | Max rows |
 | `order_by` | Sorting (must end with `ASC` or `DESC`) |
 | `where` | WHERE condition |
+| `cascade_from` | Cascade filtering by FK parent (see below) |
+
+### Cascade Dependencies (cascade_from)
+
+When partially exporting related tables, data can become inconsistent: a child table may reference rows that didn't make it into the parent's dump. The `cascade_from` option solves this by automatically generating a WHERE subquery that limits the selection to only those rows whose FK parent is present in the dump.
+
+```yaml
+partial_export:
+  public:
+    users:
+      limit: 500
+      order_by: id DESC
+    orders:
+      limit: 1000
+      order_by: created_at DESC
+      cascade_from:
+        - parent: public.users
+          fk_column: user_id
+          parent_column: id
+    order_items:
+      limit: 5000
+      order_by: id DESC
+      cascade_from:
+        - parent: public.orders
+          fk_column: order_id
+          parent_column: id
+```
+
+In this example:
+- `orders` exports only orders whose `user_id` exists among exported `users`
+- `order_items` exports only items belonging to exported `orders`
+- Subqueries are nested: `order_items` -> `orders` -> `users` (up to 10 levels deep)
+
+The `prepare-config` command automatically detects FK dependencies and generates `cascade_from`. To disable: `--no-cascade`.
+
+### Personal Data Masking (faker)
+
+The package can automatically detect and replace personal data during export. This allows safe use of dumps in dev/staging environments.
+
+**Supported patterns:**
+
+| Pattern | Description | Original example | Replacement example |
+|---------|-------------|------------------|---------------------|
+| `fio` | Full Russian name | Иванов Иван Иванович | Петров Александр Сергеевич |
+| `fio_short` | Short Russian name | Иванов И.И. | Козлов А.В. |
+| `email` | Email address | ivan@company.ru | aleksandr.petrov42@example.com |
+| `phone` | Phone number | +79161234567 | 79234567890 |
+
+**The `faker` section in configuration:**
+
+```yaml
+faker:
+  public:
+    users:
+      full_name: fio
+      email: email
+      phone: phone
+    employees:
+      fio: fio
+      short_fio: fio_short
+      contact_email: email
+```
+
+The `prepare-config` command automatically analyzes table contents and generates the `faker` section when PII patterns are detected in columns (threshold: 80% match from 200 random rows). To disable: `--no-faker`.
+
+Replacement is deterministic — the same table always produces the same result (seed is based on table name and first data row).
+
+### Config Splitting by Schema (includes)
+
+When dealing with many tables, the configuration can become unwieldy. The `prepare-config` command splits config into per-schema files by default:
+
+```
+config/
+├── dump_config.yaml          # main file with includes
+├── public.yaml               # public schema config
+├── system.yaml               # system schema config
+└── analytics/                # named connection
+    └── analytics.yaml
+```
+
+**Main file (`dump_config.yaml`):**
+
+```yaml
+includes:
+  public: public.yaml
+  system: system.yaml
+
+connections:
+  analytics:
+    includes:
+      analytics: analytics/analytics.yaml
+```
+
+**Schema file (`public.yaml`):**
+
+```yaml
+full_export:
+  - users
+  - roles
+partial_export:
+  clients:
+    limit: 1000
+    order_by: created_at DESC
+faker:
+  users:
+    full_name: fio
+    email: email
+```
+
+To generate a single file without splitting: `--no-split`.
 
 ### Multiple Connections
 
@@ -785,6 +1047,9 @@ php artisan dbdump:prepare-config
 |--------|-------------|---------|
 | `--threshold`, `-t` | Row threshold: tables with rows <= threshold go to full_export, more — to partial_export | 500 |
 | `--force`, `-f` | Overwrite file without asking | — |
+| `--no-cascade` | Skip FK detection and `cascade_from` generation | — |
+| `--no-faker` | Skip personal data detection | — |
+| `--no-split` | Generate a single YAML without splitting by schema | — |
 
 **How tables are sorted:**
 - Rows <= threshold — `full_export`
@@ -858,9 +1123,13 @@ php bin/console app:dbdump:import --skip-before --skip-after
 php bin/console app:dbdump:import --schema=public
 php bin/console app:dbdump:import --connection=all
 
+# Export without cascade filtering and without PII replacement
+php bin/console app:dbdump:export all --no-cascade --no-faker
+
 # Generate config from DB structure
 php bin/console app:dbdump:prepare-config
 php bin/console app:dbdump:prepare-config --threshold=1000 --force
+php bin/console app:dbdump:prepare-config --no-cascade --no-faker --no-split
 ```
 
 ## Laravel Setup
@@ -917,9 +1186,13 @@ php artisan dbdump:import --skip-before --skip-after
 php artisan dbdump:import --schema=public
 php artisan dbdump:import --connection=all
 
+# Export without cascade filtering and without PII replacement
+php artisan dbdump:export all --no-cascade --no-faker
+
 # Generate config from DB structure
 php artisan dbdump:prepare-config
 php artisan dbdump:prepare-config --threshold=1000 --force
+php artisan dbdump:prepare-config --no-cascade --no-faker --no-split
 ```
 
 ## Before/After Scripts
@@ -976,27 +1249,31 @@ Add to the top of your `dump_config.yaml`:
 ### How Export Works
 
 ```
-Command → TableConfigResolver → DatabaseDumper → DataFetcher → SqlGenerator → .sql files
+Command → TableConfigResolver → DatabaseDumper → [FK sorting] → DataFetcher → [Cascade WHERE] → [Faker] → SqlGenerator → .sql files
 ```
 
 1. **TableConfigResolver** — reads YAML and builds a list of tables to export
 2. **DatabaseDumper** — manages the export process
-3. **DataFetcher** — fetches data from the DB via `ConnectionRegistry`
-4. **SqlGenerator** — generates SQL: TRUNCATE + INSERT + counter reset
-5. Result is saved to `database/dumps/{schema}/{table}.sql`
+3. **TableDependencyResolver** — topological sorting of tables by FK (parents are exported first)
+4. **DataFetcher** — fetches data from the DB via `ConnectionRegistry`
+5. **CascadeWhereResolver** — generates WHERE subqueries from `cascade_from` for data consistency
+6. **RussianFaker** — replaces personal data (names, email, phone) with generated values
+7. **SqlGenerator** — generates SQL: TRUNCATE + INSERT + counter reset
+8. Result is saved to `database/dumps/{schema}/{table}.sql`
 
 ### How Import Works
 
 ```
-Command → DatabaseImporter → ProductionGuard → TransactionManager → ScriptExecutor → SqlParser → execution
+Command → DatabaseImporter → ProductionGuard → TransactionManager → [FK sorting] → ScriptExecutor → SqlParser → execution
 ```
 
 1. **ProductionGuard** — checks we're not on production
 2. **TransactionManager** — wraps everything in a transaction
-3. **ScriptExecutor** — runs scripts from `before_exec/`
-4. **SqlParser** / **StatementSplitter** — splits .sql files into individual statements
-5. Statements are executed against the DB
-6. **ScriptExecutor** — runs scripts from `after_exec/`
+3. **TableDependencyResolver** — topological sorting of files by FK (parents are imported first)
+4. **ScriptExecutor** — runs scripts from `before_exec/`
+5. **SqlParser** / **StatementSplitter** — splits .sql files into individual statements
+6. Statements are executed against the DB
+7. **ScriptExecutor** — runs scripts from `after_exec/`
 
 ### Platform Differences
 
@@ -1033,6 +1310,7 @@ src/
 ├── Config/                           # Configuration classes
 │   ├── DumpConfig.php                #   Overall dump settings
 │   ├── EnvironmentConfig.php         #   Environment detection
+│   ├── FakerConfig.php               #   PII masking settings
 │   └── TableConfig.php              #   Per-table export settings
 ├── Contract/                         # Interfaces
 ├── Exception/                        # Exceptions
@@ -1042,9 +1320,21 @@ src/
 │   └── PlatformFactory.php
 ├── Service/
 │   ├── ConfigGenerator/              # Config auto-generation
+│   │   ├── ConfigGenerator.php       #   dump_config.yaml generator
+│   │   ├── ConfigSplitter.php        #   Splitting into per-schema files
+│   │   └── ForeignKeyInspector.php   #   FK inspection from information_schema
 │   ├── ConnectionRegistry.php        # Connection registry
 │   ├── Dumper/                       # Dump export
+│   │   ├── CascadeWhereResolver.php  #   Recursive cascade WHERE resolution
+│   │   ├── DatabaseDumper.php        #   Main exporter
+│   │   └── DataFetcher.php           #   Table data loading
+│   ├── Faker/                        # Personal data masking
+│   │   ├── PatternDetector.php       #   Automatic PII pattern detection
+│   │   └── RussianFaker.php          #   Russian names/email/phone generator
 │   ├── Generator/                    # SQL generation
+│   ├── Graph/                        # FK dependency graph
+│   │   ├── TableDependencyResolver.php #  FK graph + topological sorting
+│   │   └── TopologicalSorter.php     #   Kahn's algorithm (BFS) + Tarjan (SCC)
 │   ├── Importer/                     # Dump import
 │   ├── Parser/                       # SQL parsing
 │   └── Security/                     # Production guard

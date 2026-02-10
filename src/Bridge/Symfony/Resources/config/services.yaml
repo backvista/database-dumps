@@ -44,6 +44,17 @@ services:
     BackVista\DatabaseDumps\:
         resource: '../../../Service/**/*'
 
+    # Faker interface binding
+    BackVista\DatabaseDumps\Contract\FakerInterface:
+        class: BackVista\DatabaseDumps\Service\Faker\RussianFaker
+
+    # ConfigGenerator needs explicit wiring due to scalar parameters
+    BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigGenerator:
+        arguments:
+            $cascadeEnabled: true
+            $fakerEnabled: true
+            $splitBySchema: true
+
     BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper:
         arguments:
             $projectDir: '%kernel.project_dir%'

@@ -12,20 +12,28 @@ use BackVista\DatabaseDumps\Contract\ConfigLoaderInterface;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Contract\DatabasePlatformInterface;
+use BackVista\DatabaseDumps\Contract\FakerInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigGenerator;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\ConfigSplitter;
+use BackVista\DatabaseDumps\Service\ConfigGenerator\ForeignKeyInspector;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\ServiceTableFilter;
 use BackVista\DatabaseDumps\Service\ConfigGenerator\TableInspector;
 use BackVista\DatabaseDumps\Service\ConnectionRegistry;
 use BackVista\DatabaseDumps\Service\Dumper\DatabaseDumper;
+use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
 use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
 use BackVista\DatabaseDumps\Service\Generator\SequenceGenerator;
 use BackVista\DatabaseDumps\Service\Generator\SqlGenerator;
+use BackVista\DatabaseDumps\Service\Faker\PatternDetector;
+use BackVista\DatabaseDumps\Service\Faker\RussianFaker;
 use BackVista\DatabaseDumps\Service\Generator\TruncateGenerator;
+use BackVista\DatabaseDumps\Service\Graph\TableDependencyResolver;
+use BackVista\DatabaseDumps\Service\Graph\TopologicalSorter;
 use BackVista\DatabaseDumps\Service\Importer\DatabaseImporter;
 use BackVista\DatabaseDumps\Service\Importer\ScriptExecutor;
 use BackVista\DatabaseDumps\Service\Importer\TransactionManager;
@@ -112,10 +120,23 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
         $this->app->singleton(SequenceGenerator::class);
         $this->app->singleton(SqlGenerator::class);
 
-        $this->app->singleton(DataFetcher::class);
+        $this->app->singleton(DataFetcher::class, function ($app) {
+            return new DataFetcher(
+                $app->make(ConnectionRegistryInterface::class),
+                $app->make(CascadeWhereResolver::class),
+                $app->make(DumpConfig::class)
+            );
+        });
 
         $this->app->singleton(ServiceTableFilter::class);
         $this->app->singleton(TableInspector::class);
+        $this->app->singleton(ForeignKeyInspector::class);
+        $this->app->singleton(TopologicalSorter::class);
+        $this->app->singleton(TableDependencyResolver::class);
+        $this->app->singleton(CascadeWhereResolver::class);
+        $this->app->singleton(PatternDetector::class);
+        $this->app->singleton(FakerInterface::class, RussianFaker::class);
+        $this->app->singleton(ConfigSplitter::class);
 
         $this->app->singleton(ConfigGenerator::class, function ($app) {
             return new ConfigGenerator(
@@ -123,7 +144,10 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
                 $app->make(ServiceTableFilter::class),
                 $app->make(FileSystemInterface::class),
                 $app->make(LoggerInterface::class),
-                $app->make(ConnectionRegistryInterface::class)
+                $app->make(ConnectionRegistryInterface::class),
+                $app->make(TableDependencyResolver::class),
+                $app->make(ConfigSplitter::class),
+                $app->make(PatternDetector::class)
             );
         });
 
@@ -141,7 +165,10 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
                 $app->make(SqlGenerator::class),
                 $app->make(FileSystemInterface::class),
                 $app->make(LoggerInterface::class),
-                $app['config']->get('database-dumps.project_dir')
+                $app['config']->get('database-dumps.project_dir'),
+                $app->make(TableDependencyResolver::class),
+                $app->make(FakerInterface::class),
+                $app->make(DumpConfig::class)
             );
         });
 
@@ -155,7 +182,8 @@ class DatabaseDumpsServiceProvider extends ServiceProvider
                 $app->make(ScriptExecutor::class),
                 $app->make(SqlParser::class),
                 $app->make(LoggerInterface::class),
-                $app['config']->get('database-dumps.project_dir')
+                $app['config']->get('database-dumps.project_dir'),
+                $app->make(TableDependencyResolver::class)
             );
         });
     }

@@ -33,6 +33,8 @@ class DumpExportCommand extends Command
             ->addArgument('table', InputArgument::OPTIONAL, 'Имя таблицы (schema.table) или "all" для всех таблиц')
             ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Фильтр по схеме для "all"')
             ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)')
+            ->addOption('no-cascade', null, InputOption::VALUE_NONE, 'Пропустить каскадную фильтрацию WHERE')
+            ->addOption('no-faker', null, InputOption::VALUE_NONE, 'Пропустить замену персональных данных')
             ->setHelp(<<<'HELP'
 Примеры:
   php bin/console app:dbdump:export public.users              Экспорт таблицы users из схемы public

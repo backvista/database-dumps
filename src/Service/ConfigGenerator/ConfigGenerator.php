@@ -7,6 +7,8 @@ use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Service\Faker\PatternDetector;
+use BackVista\DatabaseDumps\Service\Graph\TableDependencyResolver;
 use Symfony\Component\Yaml\Yaml;
 
 /**
@@ -31,18 +33,72 @@ class ConfigGenerator
     /** @var ConnectionRegistryInterface */
     private $registry;
 
+    /** @var TableDependencyResolver */
+    private $dependencyResolver;
+
+    /** @var ConfigSplitter */
+    private $configSplitter;
+
+    /** @var PatternDetector */
+    private $patternDetector;
+
+    /** @var bool */
+    private $cascadeEnabled;
+
+    /** @var bool */
+    private $fakerEnabled;
+
+    /** @var bool */
+    private $splitBySchema;
+
     public function __construct(
         TableInspector $inspector,
         ServiceTableFilter $filter,
         FileSystemInterface $fileSystem,
         LoggerInterface $logger,
-        ConnectionRegistryInterface $registry
+        ConnectionRegistryInterface $registry,
+        TableDependencyResolver $dependencyResolver,
+        ConfigSplitter $configSplitter,
+        PatternDetector $patternDetector,
+        bool $cascadeEnabled = true,
+        bool $fakerEnabled = true,
+        bool $splitBySchema = true
     ) {
         $this->inspector = $inspector;
         $this->filter = $filter;
         $this->fileSystem = $fileSystem;
         $this->logger = $logger;
         $this->registry = $registry;
+        $this->dependencyResolver = $dependencyResolver;
+        $this->configSplitter = $configSplitter;
+        $this->patternDetector = $patternDetector;
+        $this->cascadeEnabled = $cascadeEnabled;
+        $this->fakerEnabled = $fakerEnabled;
+        $this->splitBySchema = $splitBySchema;
+    }
+
+    /**
+     * @param bool $enabled
+     */
+    public function setCascadeEnabled(bool $enabled): void
+    {
+        $this->cascadeEnabled = $enabled;
+    }
+
+    /**
+     * @param bool $enabled
+     */
+    public function setFakerEnabled(bool $enabled): void
+    {
+        $this->fakerEnabled = $enabled;
+    }
+
+    /**
+     * @param bool $enabled
+     */
+    public function setSplitBySchema(bool $enabled): void
+    {
+        $this->splitBySchema = $enabled;
     }
 
     /**
@@ -63,6 +119,9 @@ class ConfigGenerator
         }
         if (!empty($defaultStats[DumpConfig::KEY_PARTIAL_EXPORT])) {
             $config[DumpConfig::KEY_PARTIAL_EXPORT] = $defaultStats[DumpConfig::KEY_PARTIAL_EXPORT];
+        }
+        if (!empty($defaultStats[DumpConfig::KEY_FAKER])) {
+            $config[DumpConfig::KEY_FAKER] = $defaultStats[DumpConfig::KEY_FAKER];
         }
 
         // Дополнительные подключения
@@ -86,6 +145,9 @@ class ConfigGenerator
             if (!empty($connStats[DumpConfig::KEY_PARTIAL_EXPORT])) {
                 $connConfig[DumpConfig::KEY_PARTIAL_EXPORT] = $connStats[DumpConfig::KEY_PARTIAL_EXPORT];
             }
+            if (!empty($connStats[DumpConfig::KEY_FAKER])) {
+                $connConfig[DumpConfig::KEY_FAKER] = $connStats[DumpConfig::KEY_FAKER];
+            }
 
             if (!empty($connConfig)) {
                 $connectionConfigs[$connName] = $connConfig;
@@ -96,9 +158,13 @@ class ConfigGenerator
             $config[DumpConfig::KEY_CONNECTIONS] = $connectionConfigs;
         }
 
-        $yaml = Yaml::dump($config, 4, 2);
-        $yaml = $this->addWhereHints($yaml);
-        $this->fileSystem->write($outputPath, $yaml);
+        if ($this->splitBySchema) {
+            $this->configSplitter->split($outputPath, $config);
+        } else {
+            $yaml = Yaml::dump($config, 4, 2);
+            $yaml = $this->addWhereHints($yaml);
+            $this->fileSystem->write($outputPath, $yaml);
+        }
 
         return $totalStats;
     }
@@ -106,7 +172,7 @@ class ConfigGenerator
     /**
      * Сгенерировать конфигурацию для одного подключения
      *
-     * @return array{full_export: array<string, array<string>>, partial_export: array<string, array<string, array<string, mixed>>>, stats: array{full: int, partial: int, skipped: int, empty: int}}
+     * @return array{full_export: array<string, array<string>>, partial_export: array<string, array<string, array<string, mixed>>>, faker: array<string, array<string, array<string, string>>>, stats: array{full: int, partial: int, skipped: int, empty: int}}
      */
     private function generateForConnection(?string $connectionName, int $threshold): array
     {
@@ -117,6 +183,12 @@ class ConfigGenerator
 
         /** @var array<string, array<string, array<string, mixed>>> $partialExport */
         $partialExport = [];
+
+        /** @var array<string, array<string, array<string, string>>> $fakerSection */
+        $fakerSection = [];
+
+        /** @var array<array{schema: string, table: string}> $nonEmptyTables */
+        $nonEmptyTables = [];
 
         $tables = $this->inspector->listTables($connectionName);
         $total = count($tables);
@@ -142,6 +214,8 @@ class ConfigGenerator
                 continue;
             }
 
+            $nonEmptyTables[] = ['schema' => $schema, 'table' => $table];
+
             if ($count <= $threshold) {
                 $this->logger->info("{$prefix} ... full_export ({$count} строк)");
                 if (!isset($fullExport[$schema])) {
@@ -163,11 +237,131 @@ class ConfigGenerator
             }
         }
 
+        // Обогащение cascade_from из FK графа
+        if ($this->cascadeEnabled) {
+            $graph = $this->dependencyResolver->getDependencyGraph($connectionName);
+            $this->addCascadeFromConfig($partialExport, $fullExport, $graph, $connectionName);
+        }
+
+        // Детекция паттернов faker
+        if ($this->fakerEnabled) {
+            foreach ($nonEmptyTables as $tableInfo) {
+                $schema = $tableInfo['schema'];
+                $table = $tableInfo['table'];
+                $patterns = $this->patternDetector->detect($schema, $table, $connectionName);
+                if (!empty($patterns)) {
+                    if (!isset($fakerSection[$schema])) {
+                        $fakerSection[$schema] = [];
+                    }
+                    $fakerSection[$schema][$table] = $patterns;
+                }
+            }
+        }
+
         return [
             DumpConfig::KEY_FULL_EXPORT => $fullExport,
             DumpConfig::KEY_PARTIAL_EXPORT => $partialExport,
+            DumpConfig::KEY_FAKER => $fakerSection,
             'stats' => $stats,
         ];
+    }
+
+    /**
+     * Обогатить partial_export записями cascade_from на основе FK графа.
+     *
+     * Также проверяет full_export таблицы, имеющие FK-родителей в partial_export,
+     * и добавляет им cascade_from (перемещая в partial_export).
+     *
+     * @param array<string, array<string, array<string, mixed>>> &$partialExport
+     * @param array<string, array<string>> &$fullExport
+     * @param array<string, array<string, array{source_column: string, target_column: string}>> $graph
+     * @param string|null $connectionName
+     */
+    private function addCascadeFromConfig(array &$partialExport, array &$fullExport, array $graph, ?string $connectionName): void
+    {
+        // Построить set-ы для быстрого lookup
+        /** @var array<string, true> $fullExportSet */
+        $fullExportSet = [];
+        foreach ($fullExport as $schema => $tables) {
+            foreach ($tables as $table) {
+                $fullExportSet[$schema . '.' . $table] = true;
+            }
+        }
+
+        /** @var array<string, true> $partialExportSet */
+        $partialExportSet = [];
+        foreach ($partialExport as $schema => $tables) {
+            foreach ($tables as $table => $conf) {
+                $partialExportSet[$schema . '.' . $table] = true;
+            }
+        }
+
+        // 1. Для каждой partial_export таблицы — добавить cascade_from от partial-родителей
+        foreach ($partialExport as $schema => $tables) {
+            foreach ($tables as $table => $conf) {
+                $childKey = $schema . '.' . $table;
+                if (!isset($graph[$childKey])) {
+                    continue;
+                }
+
+                $cascadeEntries = [];
+                foreach ($graph[$childKey] as $parentKey => $columns) {
+                    // Пропускаем full_export родителей (все данные присутствуют)
+                    if (isset($fullExportSet[$parentKey])) {
+                        continue;
+                    }
+                    // Добавляем только если родитель в partial_export
+                    if (isset($partialExportSet[$parentKey])) {
+                        $cascadeEntries[] = [
+                            'parent' => $parentKey,
+                            'fk_column' => $columns['source_column'],
+                            'parent_column' => $columns['target_column'],
+                        ];
+                    }
+                }
+
+                if (!empty($cascadeEntries)) {
+                    $partialExport[$schema][$table][TableConfig::KEY_CASCADE_FROM] = $cascadeEntries;
+                }
+            }
+        }
+
+        // 2. Проверить full_export таблицы с FK-родителями в partial_export
+        foreach ($fullExport as $schema => $tables) {
+            foreach ($tables as $index => $table) {
+                $childKey = $schema . '.' . $table;
+                if (!isset($graph[$childKey])) {
+                    continue;
+                }
+
+                $cascadeEntries = [];
+                foreach ($graph[$childKey] as $parentKey => $columns) {
+                    if (isset($partialExportSet[$parentKey])) {
+                        $cascadeEntries[] = [
+                            'parent' => $parentKey,
+                            'fk_column' => $columns['source_column'],
+                            'parent_column' => $columns['target_column'],
+                        ];
+                    }
+                }
+
+                if (!empty($cascadeEntries)) {
+                    // Переместить из full_export в partial_export с cascade_from
+                    unset($fullExport[$schema][$index]);
+                    $fullExport[$schema] = array_values($fullExport[$schema]);
+                    if (empty($fullExport[$schema])) {
+                        unset($fullExport[$schema]);
+                    }
+
+                    if (!isset($partialExport[$schema])) {
+                        $partialExport[$schema] = [];
+                    }
+                    $partialExport[$schema][$table] = [
+                        TableConfig::KEY_CASCADE_FROM => $cascadeEntries,
+                    ];
+                }
+            }
+        }
     }
 
     /**

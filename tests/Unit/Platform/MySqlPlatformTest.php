@@ -63,4 +63,9 @@ class MySqlPlatformTest extends TestCase
         $this->assertStringNotContainsString('setval', $sql);
         $this->assertStringNotContainsString('pg_get_serial_sequence', $sql);
     }
+
+    public function testGetRandomFunctionSql(): void
+    {
+        $this->assertEquals('RAND()', $this->platform->getRandomFunctionSql());
+    }
 }

@@ -91,4 +91,40 @@ class TableConfigTest extends TestCase
         $config = TableConfig::fromArray('public', 'users', []);
         $this->assertNull($config->getConnectionName());
     }
+
+    public function testCascadeFromDefaultIsNull(): void
+    {
+        $config = new TableConfig('public', 'users');
+        $this->assertNull($config->getCascadeFrom());
+    }
+
+    public function testCascadeFromFromConstructor(): void
+    {
+        $cascadeFrom = [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ];
+        $config = new TableConfig('public', 'orders', 500, null, 'id DESC', null, $cascadeFrom);
+        $this->assertEquals($cascadeFrom, $config->getCascadeFrom());
+    }
+
+    public function testFromArrayWithCascadeFrom(): void
+    {
+        $cascadeFrom = [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+            ['parent' => 'public.categories', 'fk_column' => 'category_id', 'parent_column' => 'id'],
+        ];
+        $config = TableConfig::fromArray('public', 'orders', [
+            TableConfig::KEY_LIMIT => 500,
+            TableConfig::KEY_ORDER_BY => 'id DESC',
+            TableConfig::KEY_CASCADE_FROM => $cascadeFrom,
+        ]);
+        $this->assertEquals($cascadeFrom, $config->getCascadeFrom());
+        $this->assertEquals(500, $config->getLimit());
+    }
+
+    public function testFromArrayWithoutCascadeFrom(): void
+    {
+        $config = TableConfig::fromArray('public', 'users', []);
+        $this->assertNull($config->getCascadeFrom());
+    }
 }

@@ -4,34 +4,60 @@ namespace BackVista\DatabaseDumps\Service\Dumper;
 
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
+use BackVista\DatabaseDumps\Contract\FakerInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Exception\ExportFailedException;
 use BackVista\DatabaseDumps\Service\Generator\SqlGenerator;
+use BackVista\DatabaseDumps\Service\Graph\TableDependencyResolver;
 
 /**
  * Экспорт данных из БД в SQL дампы
  */
 class DatabaseDumper
 {
-    private DataFetcher $dataFetcher;
-    private SqlGenerator $sqlGenerator;
-    private FileSystemInterface $fileSystem;
-    private LoggerInterface $logger;
-    private string $projectDir;
+    /** @var DataFetcher */
+    private $dataFetcher;
+
+    /** @var SqlGenerator */
+    private $sqlGenerator;
+
+    /** @var FileSystemInterface */
+    private $fileSystem;
+
+    /** @var LoggerInterface */
+    private $logger;
+
+    /** @var string */
+    private $projectDir;
+
+    /** @var TableDependencyResolver */
+    private $dependencyResolver;
+
+    /** @var FakerInterface */
+    private $faker;
+
+    /** @var DumpConfig */
+    private $dumpConfig;
 
     public function __construct(
         DataFetcher $dataFetcher,
         SqlGenerator $sqlGenerator,
         FileSystemInterface $fileSystem,
         LoggerInterface $logger,
-        string $projectDir
+        string $projectDir,
+        TableDependencyResolver $dependencyResolver,
+        FakerInterface $faker,
+        DumpConfig $dumpConfig
     ) {
         $this->dataFetcher = $dataFetcher;
         $this->sqlGenerator = $sqlGenerator;
         $this->fileSystem = $fileSystem;
         $this->logger = $logger;
         $this->projectDir = $projectDir;
+        $this->dependencyResolver = $dependencyResolver;
+        $this->faker = $faker;
+        $this->dumpConfig = $dumpConfig;
     }
 
     /**
@@ -49,6 +75,34 @@ class DatabaseDumper
      */
     public function exportAll(array $tables): void
     {
+        if (empty($tables)) {
+            return;
+        }
+
+        // Sort by FK dependencies (parents first)
+        $tableKeys = array_map(function (TableConfig $t) {
+            return $t->getFullTableName();
+        }, $tables);
+
+        $connectionName = $tables[0]->getConnectionName();
+
+        try {
+            $sortedKeys = $this->dependencyResolver->sortForExport($tableKeys, $connectionName);
+            $tableMap = [];
+            foreach ($tables as $t) {
+                $tableMap[$t->getFullTableName()] = $t;
+            }
+            $tables = [];
+            foreach ($sortedKeys as $key) {
+                if (isset($tableMap[$key])) {
+                    $tables[] = $tableMap[$key];
+                }
+            }
+        } catch (\RuntimeException $e) {
+            // Cycle detected - fall back to original order, log warning
+            $this->logger->warning('Цикл FK зависимостей, используется исходный порядок: ' . $e->getMessage());
+        }
+
         $total = count($tables);
         $current = 0;
 
@@ -73,10 +127,24 @@ class DatabaseDumper
             // 1. Загрузка данных
             $rows = $this->dataFetcher->fetch($config);
 
-            // 2. Генерация SQL
+            // 2. Применение фейкера (замена ПД)
+            $fakerTableConfig = $this->dumpConfig->getFakerConfig()->getTableFaker(
+                $config->getSchema(),
+                $config->getTable()
+            );
+            if ($fakerTableConfig !== null) {
+                $rows = $this->faker->apply(
+                    $config->getSchema(),
+                    $config->getTable(),
+                    $fakerTableConfig,
+                    $rows
+                );
+            }
+
+            // 3. Генерация SQL
             $sql = $this->sqlGenerator->generate($config, $rows);
 
-            // 3. Сохранение файла
+            // 4. Сохранение файла
             $filename = $this->buildDumpPath($config);
             $this->ensureDirectoryExists(dirname($filename));
             $this->fileSystem->write($filename, $sql);

@@ -10,6 +10,8 @@ class DumpConfig
     public const KEY_FULL_EXPORT = 'full_export';
     public const KEY_PARTIAL_EXPORT = 'partial_export';
     public const KEY_CONNECTIONS = 'connections';
+    public const KEY_INCLUDES = 'includes';
+    public const KEY_FAKER = 'faker';
     public const DUMPS_DIR = 'database/dumps';
 
     /**
@@ -27,19 +29,25 @@ class DumpConfig
      */
     private array $connections;
 
+    /** @var FakerConfig|null */
+    private $fakerConfig;
+
     /**
-     * @param array<string, array<string>> $fullExport Полный экспорт по схемам
-     * @param array<string, array<string, array<string, mixed>>> $partialExport Частичный экспорт с условиями
-     * @param array<string, DumpConfig> $connections Конфигурации дополнительных подключений
+     * @param array<string, array<string>> $fullExport
+     * @param array<string, array<string, array<string, mixed>>> $partialExport
+     * @param array<string, DumpConfig> $connections
+     * @param FakerConfig|null $fakerConfig
      */
     public function __construct(
         array $fullExport,
         array $partialExport,
-        array $connections = []
+        array $connections = [],
+        ?FakerConfig $fakerConfig = null
     ) {
         $this->fullExport = $fullExport;
         $this->partialExport = $partialExport;
         $this->connections = $connections;
+        $this->fakerConfig = $fakerConfig;
     }
 
     /**
@@ -126,5 +134,17 @@ class DumpConfig
     public function isMultiConnection(): bool
     {
         return !empty($this->connections);
+    }
+
+    /**
+     * Получить конфигурацию фейкера
+     */
+    public function getFakerConfig(): FakerConfig
+    {
+        if ($this->fakerConfig === null) {
+            return new FakerConfig();
+        }
+
+        return $this->fakerConfig;
     }
 }

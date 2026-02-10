@@ -7,6 +7,7 @@ use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Exception\ImportFailedException;
+use BackVista\DatabaseDumps\Service\Graph\TableDependencyResolver;
 use BackVista\DatabaseDumps\Service\Parser\SqlParser;
 use BackVista\DatabaseDumps\Service\Security\ProductionGuard;
 
@@ -28,6 +29,9 @@ class DatabaseImporter
     private LoggerInterface $logger;
     private string $projectDir;
 
+    /** @var TableDependencyResolver */
+    private $dependencyResolver;
+
     public function __construct(
         ConnectionRegistryInterface $registry,
         DumpConfig $dumpConfig,
@@ -37,7 +41,8 @@ class DatabaseImporter
         ScriptExecutor $scriptExecutor,
         SqlParser $parser,
         LoggerInterface $logger,
-        string $projectDir
+        string $projectDir,
+        TableDependencyResolver $dependencyResolver
     ) {
         $this->registry = $registry;
         $this->dumpConfig = $dumpConfig;
@@ -48,6 +53,7 @@ class DatabaseImporter
         $this->parser = $parser;
         $this->logger = $logger;
         $this->projectDir = $projectDir;
+        $this->dependencyResolver = $dependencyResolver;
     }
 
     /**
@@ -148,11 +154,15 @@ class DatabaseImporter
             throw ImportFailedException::noDumpsFound($dumpsPath);
         }
 
-        // Сортировка для предсказуемого порядка
+        // Сортировка для предсказуемого порядка (фолбэк)
         sort($files);
 
-        // Фильтрация по схеме для подсчёта
+        // Фильтрация по схеме
         $filteredFiles = $this->filterFilesBySchema($files, $schemaFilter);
+
+        // Топологическая сортировка по FK зависимостям
+        $filteredFiles = $this->sortFilesByDependencies($filteredFiles, $connectionName);
+
         $total = count($filteredFiles);
         $current = 0;
 
@@ -162,6 +172,55 @@ class DatabaseImporter
             $current++;
             $this->importDumpFile($file, $current, $total, $connection);
         }
+    }
+
+    /**
+     * Отсортировать файлы по FK зависимостям (родители первыми).
+     *
+     * При циклических зависимостях — фолбэк на исходный порядок.
+     *
+     * @param string[] $files
+     * @return string[]
+     */
+    private function sortFilesByDependencies(array $files, ?string $connectionName): array
+    {
+        // Построить маппинг "schema.table" => filePath
+        $keyToFile = [];
+        $tableKeys = [];
+        foreach ($files as $filePath) {
+            $pathParts = explode(DIRECTORY_SEPARATOR, $filePath);
+            $schema = $pathParts[count($pathParts) - 2] ?? '';
+            $tableName = basename($filePath, '.sql');
+            $key = $schema . '.' . $tableName;
+
+            $keyToFile[$key] = $filePath;
+            $tableKeys[] = $key;
+        }
+
+        try {
+            $sortedKeys = $this->dependencyResolver->sortForImport($tableKeys, $connectionName);
+        } catch (\RuntimeException $e) {
+            $this->logger->warning('Циклическая зависимость при сортировке импорта: ' . $e->getMessage() . '. Используется алфавитный порядок.');
+            return $files;
+        }
+
+        // Переупорядочить файлы по отсортированным ключам
+        $sortedFiles = [];
+        foreach ($sortedKeys as $key) {
+            if (isset($keyToFile[$key])) {
+                $sortedFiles[] = $keyToFile[$key];
+            }
+        }
+
+        // Добавить файлы, не попавшие в ключи (на всякий случай)
+        $sortedSet = array_flip($sortedFiles);
+        foreach ($files as $file) {
+            if (!isset($sortedSet[$file])) {
+                $sortedFiles[] = $file;
+            }
+        }
+
+        return $sortedFiles;
     }
 
     /**

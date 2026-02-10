@@ -40,4 +40,9 @@ class MySqlPlatform implements DatabasePlatformInterface
 
         return $sql;
     }
+
+    public function getRandomFunctionSql(): string
+    {
+        return 'RAND()';
+    }
 }

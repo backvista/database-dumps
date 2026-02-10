@@ -55,4 +55,9 @@ class PostgresPlatform implements DatabasePlatformInterface
 
         return $sql;
     }
+
+    public function getRandomFunctionSql(): string
+    {
+        return 'RANDOM()';
+    }
 }

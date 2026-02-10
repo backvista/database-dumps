@@ -83,4 +83,9 @@ class PostgresPlatformTest extends TestCase
 
         $this->assertStringContainsString('Ошибка получения sequences', $sql);
     }
+
+    public function testGetRandomFunctionSql(): void
+    {
+        $this->assertEquals('RANDOM()', $this->platform->getRandomFunctionSql());
+    }
 }

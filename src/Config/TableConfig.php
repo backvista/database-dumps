@@ -11,6 +11,7 @@ class TableConfig
     public const KEY_WHERE = 'where';
 
     public const KEY_ORDER_BY = 'order_by';
+    public const KEY_CASCADE_FROM = 'cascade_from';
 
     private string $schema;
     private string $table;
@@ -19,14 +20,20 @@ class TableConfig
     private ?string $orderBy;
     /** @var string|null */
     private $connectionName;
+    /** @var array<int, array{parent: string, fk_column: string, parent_column: string}>|null */
+    private $cascadeFrom;
 
+    /**
+     * @param array<int, array{parent: string, fk_column: string, parent_column: string}>|null $cascadeFrom
+     */
     public function __construct(
         string $schema,
         string $table,
         ?int $limit = null,
         ?string $where = null,
         ?string $orderBy = null,
-        ?string $connectionName = null
+        ?string $connectionName = null,
+        ?array $cascadeFrom = null
     ) {
         $this->schema = $schema;
         $this->table = $table;
@@ -34,6 +41,7 @@ class TableConfig
         $this->where = $where;
         $this->orderBy = $orderBy;
         $this->connectionName = $connectionName;
+        $this->cascadeFrom = $cascadeFrom;
     }
 
     public function getSchema(): string
@@ -82,6 +90,16 @@ class TableConfig
     }
 
     /**
+     * Получить конфигурацию каскадных зависимостей
+     *
+     * @return array<int, array{parent: string, fk_column: string, parent_column: string}>|null
+     */
+    public function getCascadeFrom(): ?array
+    {
+        return $this->cascadeFrom;
+    }
+
+    /**
      * Создать из массива конфигурации
      *
      * @param string $schema
@@ -92,13 +110,16 @@ class TableConfig
      */
     public static function fromArray(string $schema, string $table, array $config = [], ?string $connectionName = null): self
     {
+        $cascadeFrom = isset($config[self::KEY_CASCADE_FROM]) ? $config[self::KEY_CASCADE_FROM] : null;
+
         return new self(
             $schema,
             $table,
             $config[self::KEY_LIMIT] ?? null,
             $config[self::KEY_WHERE] ?? null,
             $config[self::KEY_ORDER_BY] ?? null,
-            $connectionName
+            $connectionName,
+            $cascadeFrom
         );
     }
 }

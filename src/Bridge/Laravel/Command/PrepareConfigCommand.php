@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class PrepareConfigCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:prepare-config {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения}';
+    protected $signature = 'dbdump:prepare-config {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения} {--no-cascade : Пропустить обнаружение FK и генерацию cascade_from} {--no-faker : Пропустить обнаружение персональных данных} {--no-split : Генерировать единый YAML без разделения по схемам}';
 
     /** @var string */
     protected $description = 'Автоматическая генерация dump_config.yaml на основе структуры БД';
@@ -71,6 +71,16 @@ HELP;
         }
 
         try {
+            if ($this->option('no-cascade')) {
+                $this->generator->setCascadeEnabled(false);
+            }
+            if ($this->option('no-faker')) {
+                $this->generator->setFakerEnabled(false);
+            }
+            if ($this->option('no-split')) {
+                $this->generator->setSplitBySchema(false);
+            }
+
             $this->line("Порог строк: {$threshold}");
             $this->line("Путь: {$this->configPath}");
 

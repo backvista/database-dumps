@@ -31,6 +31,9 @@ class PrepareConfigCommand extends Command
             ->setDescription('Автоматическая генерация dump_config.yaml на основе структуры БД')
             ->addOption('threshold', 't', InputOption::VALUE_REQUIRED, 'Порог строк для partial_export', '500')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Перезаписать без подтверждения')
+            ->addOption('no-cascade', null, InputOption::VALUE_NONE, 'Пропустить обнаружение FK и генерацию cascade_from')
+            ->addOption('no-faker', null, InputOption::VALUE_NONE, 'Пропустить обнаружение персональных данных')
+            ->addOption('no-split', null, InputOption::VALUE_NONE, 'Генерировать единый YAML без разделения по схемам')
             ->setHelp(<<<'HELP'
 Анализирует структуру БД и генерирует dump_config.yaml.
 Таблицы с количеством строк <= threshold попадают в full_export,
@@ -74,6 +77,16 @@ HELP
             $io->text("Порог строк: {$threshold}");
             $io->text("Путь: {$outputPath}");
             $io->newLine();
+
+            if ($input->getOption('no-cascade')) {
+                $this->generator->setCascadeEnabled(false);
+            }
+            if ($input->getOption('no-faker')) {
+                $this->generator->setFakerEnabled(false);
+            }
+            if ($input->getOption('no-split')) {
+                $this->generator->setSplitBySchema(false);
+            }
 
             $stats = $this->generator->generate($outputPath, $threshold);
 

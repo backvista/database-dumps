@@ -28,4 +28,9 @@ interface DatabasePlatformInterface
      * Получить SQL для сброса sequence/auto-increment
      */
     public function getSequenceResetSql(string $schema, string $table, DatabaseConnectionInterface $connection): string;
+
+    /**
+     * Получить SQL-функцию случайного числа для платформы
+     */
+    public function getRandomFunctionSql(): string;
 }

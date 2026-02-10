@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Config;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Config\DumpConfig;
+use BackVista\DatabaseDumps\Config\FakerConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 
 class DumpConfigTest extends TestCase
@@ -91,5 +92,38 @@ class DumpConfigTest extends TestCase
         $config = $this->config->getTableConfig('nonexistent', 'table');
 
         $this->assertNull($config);
+    }
+
+    public function testFakerConfigDefaultIsEmpty(): void
+    {
+        $this->assertTrue($this->config->getFakerConfig()->isEmpty());
+    }
+
+    public function testFakerConfigFromConstructor(): void
+    {
+        $fakerConfig = new FakerConfig([
+            'public' => [
+                'users' => ['email' => 'email', 'full_name' => 'fio'],
+            ],
+        ]);
+
+        $config = new DumpConfig(
+            ['public' => ['users']],
+            [],
+            [],
+            $fakerConfig
+        );
+
+        $this->assertFalse($config->getFakerConfig()->isEmpty());
+        $this->assertEquals(
+            ['email' => 'email', 'full_name' => 'fio'],
+            $config->getFakerConfig()->getTableFaker('public', 'users')
+        );
+    }
+
+    public function testKeyConstants(): void
+    {
+        $this->assertEquals('includes', DumpConfig::KEY_INCLUDES);
+        $this->assertEquals('faker', DumpConfig::KEY_FAKER);
     }
 }

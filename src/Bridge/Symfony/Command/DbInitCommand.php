@@ -28,6 +28,7 @@ class DbInitCommand extends Command
             ->addOption('skip-after', null, InputOption::VALUE_NONE, 'Пропустить after_exec скрипты')
             ->addOption('schema', 's', InputOption::VALUE_REQUIRED, 'Импорт только указанной схемы')
             ->addOption('connection', 'c', InputOption::VALUE_REQUIRED, 'Имя подключения (или "all" для всех)')
+            ->addOption('no-cascade', null, InputOption::VALUE_NONE, 'Пропустить топологическую сортировку импорта')
             ->setHelp(<<<'HELP'
 Примеры:
   php bin/console app:dbdump:import                          Импорт всех дампов
