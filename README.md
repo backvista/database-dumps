@@ -267,7 +267,7 @@ faker:
 
 Команда `prepare-config` автоматически анализирует содержимое таблиц и генерирует секцию `faker`, если в колонках обнаруживаются паттерны ПД (порог совпадения: 80% из 200 случайных строк). Чтобы отключить: `--no-faker`.
 
-Замена детерминирована — одно и то же значение всегда даёт одинаковую замену независимо от таблицы и запуска (seed основан на хеше конкретного значения ячейки).
+Замена детерминирована — seed основан на хеше значения ФИО (колонка с паттерном `fio`), если такая колонка есть в конфигурации таблицы. Если колонки `fio` нет — seed берётся от хеша комбинации всех faker-значений строки. Это гарантирует, что одна и та же персона всегда получает одинаковую замену независимо от таблицы и запуска.
 
 ### Разделение конфига по схемам (includes)
 
@@ -1019,7 +1019,7 @@ The `gender` pattern is detected by matching both the column name (`gender`, `se
 
 The `prepare-config` command automatically analyzes table contents and generates the `faker` section when PII patterns are detected in columns (threshold: 80% match from 200 random rows). To disable: `--no-faker`.
 
-Replacement is deterministic — the same input value always produces the same replacement regardless of the table or run (seed is based on the hash of the specific cell value).
+Replacement is deterministic — the seed is based on the hash of the FIO value (column with `fio` pattern), if such a column exists in the table's faker config. If there is no `fio` column, the seed is computed from the hash of all faker column values in the row. This ensures the same person always gets the same replacement regardless of the table or run.
 
 ### Config Splitting by Schema (includes)
 

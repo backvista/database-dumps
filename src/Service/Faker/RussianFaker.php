@@ -6,7 +6,7 @@ use BackVista\DatabaseDumps\Contract\FakerInterface;
 
 /**
  * Заменяет персональные данные на сгенерированные русские ФИО, email, телефоны.
- * Детерминирован: seed по хешу комбинации всех faker-значений строки.
+ * Детерминирован: seed по хешу ФИО (если есть колонка fio), иначе по комбинации всех faker-значений.
  */
 class RussianFaker implements FakerInterface
 {
@@ -204,7 +204,7 @@ class RussianFaker implements FakerInterface
 
     /**
      * Заменяет ПД в строках данных согласно fakerConfig.
-     * Seed привязан к комбинации всех faker-значений строки, а не к отдельной ячейке.
+     * Seed: если есть колонка с паттерном fio — хеш от неё, иначе хеш от всех faker-значений строки.
      *
      * @inheritDoc
      */
@@ -214,13 +214,26 @@ class RussianFaker implements FakerInterface
             return $rows;
         }
 
-        foreach ($rows as &$row) {
-            // Комбинированный seed от всех faker-значений строки
-            $seedParts = [];
-            foreach ($fakerConfig as $column => $patternType) {
-                $seedParts[] = isset($row[$column]) ? (string) $row[$column] : '';
+        // Находим колонку с паттерном fio (ФИО из 3 слов) для приоритетного сидирования
+        $fioColumn = null;
+        foreach ($fakerConfig as $column => $patternType) {
+            if ($patternType === PatternDetector::PATTERN_FIO) {
+                $fioColumn = $column;
+                break;
             }
-            mt_srand(crc32(implode("\0", $seedParts)));
+        }
+
+        foreach ($rows as &$row) {
+            // Seed: приоритет — ФИО (3 слова), иначе хеш всех faker-значений
+            if ($fioColumn !== null && isset($row[$fioColumn])) {
+                mt_srand(crc32((string) $row[$fioColumn]));
+            } else {
+                $seedParts = [];
+                foreach ($fakerConfig as $column => $patternType) {
+                    $seedParts[] = isset($row[$column]) ? (string) $row[$column] : '';
+                }
+                mt_srand(crc32(implode("\0", $seedParts)));
+            }
 
             // Один «человек» на строку
             $gender = mt_rand(0, 1); // 0=male, 1=female

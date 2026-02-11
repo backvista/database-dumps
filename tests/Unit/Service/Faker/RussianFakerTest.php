@@ -137,8 +137,29 @@ class RussianFakerTest extends TestCase
         ];
         $result = $this->faker->apply('public', 'users', $fakerConfig, $rows);
 
-        // Одинаковое имя + разный email → разные замены name
+        // Нет fio-паттерна → seed от всех колонок → разный email даёт разные замены name
         $this->assertNotEquals($result[0]['display_name'], $result[1]['display_name']);
+    }
+
+    public function testFioSeedPriorityOverOtherColumns(): void
+    {
+        $fakerConfig = [
+            'full_name' => PatternDetector::PATTERN_FIO,
+            'email' => PatternDetector::PATTERN_EMAIL,
+        ];
+        $rows1 = [
+            ['id' => 1, 'full_name' => 'Тестов Тест Тестович', 'email' => 'one@example.com'],
+        ];
+        $rows2 = [
+            ['id' => 2, 'full_name' => 'Тестов Тест Тестович', 'email' => 'other@example.com'],
+        ];
+
+        $result1 = $this->faker->apply('public', 'users', $fakerConfig, $rows1);
+        $result2 = $this->faker->apply('public', 'users', $fakerConfig, $rows2);
+
+        // Одинаковое ФИО → одинаковый seed → одинаковая замена, независимо от email
+        $this->assertEquals($result1[0]['full_name'], $result2[0]['full_name']);
+        $this->assertEquals($result1[0]['email'], $result2[0]['email']);
     }
 
     public function testFioAndFioShortConsistentInSameRow(): void
