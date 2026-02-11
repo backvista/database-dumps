@@ -61,7 +61,7 @@ class RussianFakerTest extends TestCase
         $result = $this->faker->apply('public', 'users', ['phone' => PatternDetector::PATTERN_PHONE], $rows);
 
         $this->assertNotEquals('+79001234567', $result[0]['phone']);
-        $this->assertMatchesRegularExpression('/^79\\d{9}$/', $result[0]['phone']);
+        $this->assertMatchesRegularExpression('/^\+79\d{9}$/', $result[0]['phone']);
     }
 
     public function testNullPreservation(): void
@@ -206,5 +206,49 @@ class RussianFakerTest extends TestCase
         $this->assertEquals($result1[0]['full_name'], $result2[0]['full_name']);
         $this->assertEquals($result1[0]['email'], $result2[0]['email']);
         $this->assertEquals($result1[0]['phone'], $result2[0]['phone']);
+    }
+
+    /**
+     * @dataProvider phoneFormatProvider
+     */
+    public function testPhoneFormatPreservation(string $input, string $regex): void
+    {
+        $rows = [['id' => 1, 'phone' => $input]];
+        $result = $this->faker->apply('public', 'users', ['phone' => PatternDetector::PATTERN_PHONE], $rows);
+        $this->assertMatchesRegularExpression($regex, $result[0]['phone']);
+        $this->assertNotEquals($input, $result[0]['phone']);
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public static function phoneFormatProvider(): array
+    {
+        return [
+            'plus-seven-parens'  => ['+7(903)150-03-03', '/^\+7\(9\d{2}\)\d{3}-\d{2}-\d{2}$/'],
+            'eight-dashes'       => ['8-929-317-7788',    '/^8-9\d{2}-\d{3}-\d{4}$/'],
+            'seven-dashes'       => ['7-905-150-0303',    '/^7-9\d{2}-\d{3}-\d{4}$/'],
+            'bare-11-digits'     => ['79051500303',       '/^79\d{9}$/'],
+            'plus-bare-11'       => ['+79501500303',      '/^\+79\d{9}$/'],
+            'eight-parens'       => ['8(903)-150-03-03',  '/^8\(9\d{2}\)-\d{3}-\d{2}-\d{2}$/'],
+            'plus-seven-spaces'  => ['+7 903 150 03 03',  '/^\+7 9\d{2} \d{3} \d{2} \d{2}$/'],
+            'ten-digits'         => ['9051500303',        '/^9\d{9}$/'],
+        ];
+    }
+
+    public function testPhonePrefixPreserved(): void
+    {
+        $rows = [['id' => 1, 'phone' => '89291234567']];
+        $result = $this->faker->apply('public', 'users', ['phone' => PatternDetector::PATTERN_PHONE], $rows);
+        $this->assertStringStartsWith('89', $result[0]['phone']);
+    }
+
+    public function testPhoneDeterminismWithFormat(): void
+    {
+        $rows = [['id' => 1, 'phone' => '+7(903)150-03-03']];
+        $config = ['phone' => PatternDetector::PATTERN_PHONE];
+        $r1 = $this->faker->apply('public', 'users', $config, $rows);
+        $r2 = $this->faker->apply('public', 'users', $config, $rows);
+        $this->assertEquals($r1[0]['phone'], $r2[0]['phone']);
     }
 }

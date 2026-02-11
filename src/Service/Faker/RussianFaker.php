@@ -188,7 +188,7 @@ class RussianFaker implements FakerInterface
                         $row[$column] = $this->generateEmail($firstName, $lastName);
                         break;
                     case PatternDetector::PATTERN_PHONE:
-                        $row[$column] = $this->generatePhone();
+                        $row[$column] = $this->generatePhone((string) $row[$column]);
                         break;
                 }
             }
@@ -209,10 +209,44 @@ class RussianFaker implements FakerInterface
         return $translitFirst . '.' . $translitLast . $num . '@' . $domain;
     }
 
-    /** Генерирует российский мобильный номер (79xxxxxxxxx). */
-    private function generatePhone(): string
+    /** Генерирует российский мобильный номер, сохраняя формат оригинала. */
+    private function generatePhone(string $originalPhone = ''): string
     {
-        return '79' . str_pad((string) mt_rand(0, 999999999), 9, '0', STR_PAD_LEFT);
+        // 10 новых цифр: 9 + 9 случайных
+        $newDigits = '9' . str_pad((string) mt_rand(0, 999999999), 9, '0', STR_PAD_LEFT);
+
+        if ($originalPhone === '') {
+            return '7' . $newDigits;
+        }
+
+        // Шаблон: каждая цифра → #
+        /** @var string $template */
+        $template = preg_replace('/\d/', '#', $originalPhone);
+        $placeholderCount = substr_count($template, '#');
+
+        if ($placeholderCount === 11) {
+            // Есть цифра префикса (7 или 8) — сохраняем её
+            preg_match('/\d/', $originalPhone, $m);
+            $allDigits = (isset($m[0]) ? $m[0] : '7') . $newDigits;
+        } elseif ($placeholderCount === 10) {
+            $allDigits = $newDigits;
+        } else {
+            return '7' . $newDigits; // fallback
+        }
+
+        // Заполнить шаблон цифрами
+        $result = '';
+        $digitIndex = 0;
+        for ($i = 0, $len = strlen($template); $i < $len; $i++) {
+            if ($template[$i] === '#') {
+                $result .= $allDigits[$digitIndex];
+                $digitIndex++;
+            } else {
+                $result .= $template[$i];
+            }
+        }
+
+        return $result;
     }
 
     /** Транслитерирует кириллический текст в латиницу. */
