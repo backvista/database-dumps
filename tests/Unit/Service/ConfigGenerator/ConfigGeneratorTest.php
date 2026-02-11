@@ -563,4 +563,358 @@ class ConfigGeneratorTest extends TestCase
 
         $generator->generate('/tmp/dump_config.yaml', 500);
     }
+
+    public function testGenerateModeAllUnchanged(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_ALL);
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(1, $stats['full']);
+        $parsed = Yaml::parse($writtenContent);
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+    }
+
+    public function testGenerateModeSchema(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'billing', 'table_name' => 'invoices'],
+            ['table_schema' => 'billing', 'table_name' => 'payments'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Файл конфига не существует
+        $this->fileSystem->method('exists')->willReturn(false);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_SCHEMA, 'billing');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(2, $stats['full']);
+        $parsed = Yaml::parse($writtenContent);
+        $this->assertArrayHasKey('billing', $parsed[DumpConfig::KEY_FULL_EXPORT]);
+        $this->assertContains('invoices', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+        $this->assertContains('payments', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+        $this->assertArrayNotHasKey('public', $parsed[DumpConfig::KEY_FULL_EXPORT]);
+    }
+
+    public function testGenerateModeTable(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'public', 'table_name' => 'orders'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Файл конфига не существует
+        $this->fileSystem->method('exists')->willReturn(false);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_TABLE, 'public.users');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(1, $stats['full']);
+        $parsed = Yaml::parse($writtenContent);
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertCount(1, $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+    }
+
+    public function testGenerateModeNew(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'public', 'table_name' => 'orders'],
+            ['table_schema' => 'public', 'table_name' => 'new_table'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Существующий конфиг с users и orders
+        $existingYaml = Yaml::dump([
+            DumpConfig::KEY_FULL_EXPORT => [
+                'public' => ['users', 'orders'],
+            ],
+        ]);
+        $this->fileSystem->method('exists')->willReturn(true);
+        $this->fileSystem->method('read')->willReturn($existingYaml);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_NEW);
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        // Только new_table сгенерирована, users и orders пропущены
+        $this->assertEquals(1, $stats['full']);
+        $this->assertEquals(2, $stats['skipped']);
+
+        $parsed = Yaml::parse($writtenContent);
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertContains('orders', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertContains('new_table', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+    }
+
+    public function testGenerateModeSchemaMergesWithExisting(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'billing', 'table_name' => 'invoices'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Существующий конфиг с public.roles и billing.old_table
+        $existingYaml = Yaml::dump([
+            DumpConfig::KEY_FULL_EXPORT => [
+                'public' => ['roles'],
+                'billing' => ['old_table'],
+            ],
+        ]);
+        $this->fileSystem->method('exists')->willReturn(true);
+        $this->fileSystem->method('read')->willReturn($existingYaml);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        // Перегенерируем только billing
+        $this->generator->setMode(ConfigGenerator::MODE_SCHEMA, 'billing');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(1, $stats['full']);
+
+        $parsed = Yaml::parse($writtenContent);
+        // public.roles сохранена из существующего конфига
+        $this->assertContains('roles', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        // billing.old_table заменена на billing.invoices
+        $this->assertContains('invoices', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+        $this->assertNotContains('old_table', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+    }
+
+    public function testGenerateModeTableMergesWithExisting(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'public', 'table_name' => 'orders'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturnMap([
+            ['public', 'users', null, 100],
+            ['public', 'orders', null, 10000],
+        ]);
+        $this->inspector->method('detectOrderColumn')->willReturn('id DESC');
+
+        // Существующий конфиг
+        $existingYaml = Yaml::dump([
+            DumpConfig::KEY_FULL_EXPORT => [
+                'public' => ['users', 'roles'],
+            ],
+            DumpConfig::KEY_PARTIAL_EXPORT => [
+                'public' => [
+                    'orders' => [
+                        'limit' => 100,
+                        'order_by' => 'created_at DESC',
+                    ],
+                ],
+            ],
+        ]);
+        $this->fileSystem->method('exists')->willReturn(true);
+        $this->fileSystem->method('read')->willReturn($existingYaml);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        // Перегенерируем только public.orders
+        $this->generator->setMode(ConfigGenerator::MODE_TABLE, 'public.orders');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(1, $stats['partial']);
+
+        $parsed = Yaml::parse($writtenContent);
+        // full_export: users и roles сохранены
+        $this->assertContains('users', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertContains('roles', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        // partial_export: orders обновлён с новыми параметрами
+        $this->assertEquals(500, $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders']['limit']);
+        $this->assertEquals('id DESC', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders']['order_by']);
+    }
+
+    public function testGenerateModeNewAppendsOnly(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // users уже в конфиге с ручными правками в partial_export
+        $existingYaml = Yaml::dump([
+            DumpConfig::KEY_PARTIAL_EXPORT => [
+                'public' => [
+                    'users' => [
+                        'limit' => 50,
+                        'where' => 'active = true',
+                    ],
+                ],
+            ],
+        ]);
+        $this->fileSystem->method('exists')->willReturn(true);
+        $this->fileSystem->method('read')->willReturn($existingYaml);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_NEW);
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        // users пропущена — уже в конфигурации
+        $this->assertEquals(0, $stats['full']);
+        $this->assertEquals(1, $stats['skipped']);
+
+        $parsed = Yaml::parse($writtenContent);
+        // Ручные правки сохранены
+        $this->assertEquals(50, $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['users']['limit']);
+        $this->assertEquals('active = true', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['users']['where']);
+    }
+
+    public function testGenerateModeSchemaNoExistingConfig(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'public', 'table_name' => 'users'],
+            ['table_schema' => 'billing', 'table_name' => 'invoices'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Файл не существует
+        $this->fileSystem->method('exists')->willReturn(false);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_SCHEMA, 'billing');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        // Только billing сгенерирована (свежий файл)
+        $this->assertEquals(1, $stats['full']);
+        $parsed = Yaml::parse($writtenContent);
+        $this->assertContains('invoices', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+        $this->assertArrayNotHasKey('public', $parsed[DumpConfig::KEY_FULL_EXPORT]);
+    }
+
+    public function testGenerateModeSchemaWithIncludes(): void
+    {
+        $this->inspector->method('listTables')->willReturn([
+            ['table_schema' => 'billing', 'table_name' => 'invoices'],
+        ]);
+
+        $this->filter->method('shouldIgnore')->willReturn(false);
+        $this->inspector->method('countRows')->willReturn(100);
+
+        // Существующий конфиг с includes
+        $mainYaml = Yaml::dump([
+            DumpConfig::KEY_INCLUDES => [
+                'public' => 'public.yaml',
+            ],
+        ]);
+        $publicYaml = Yaml::dump([
+            DumpConfig::KEY_FULL_EXPORT => ['roles', 'permissions'],
+        ]);
+
+        $this->fileSystem->method('exists')->willReturn(true);
+        $this->fileSystem->method('read')->willReturnMap([
+            ['/tmp/dump_config.yaml', $mainYaml],
+            ['/tmp/public.yaml', $publicYaml],
+        ]);
+
+        /** @var string $writtenContent */
+        $writtenContent = '';
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->willReturnCallback(function ($path, $content) use (&$writtenContent) {
+                $writtenContent = $content;
+            });
+
+        $this->generator->setMode(ConfigGenerator::MODE_SCHEMA, 'billing');
+        $stats = $this->generator->generate('/tmp/dump_config.yaml', 500);
+
+        $this->assertEquals(1, $stats['full']);
+        $parsed = Yaml::parse($writtenContent);
+        // public из includes сохранена
+        $this->assertContains('roles', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        $this->assertContains('permissions', $parsed[DumpConfig::KEY_FULL_EXPORT]['public']);
+        // billing сгенерирована заново
+        $this->assertContains('invoices', $parsed[DumpConfig::KEY_FULL_EXPORT]['billing']);
+    }
 }

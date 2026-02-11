@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class PrepareConfigCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:prepare-config {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения} {--no-cascade : Пропустить обнаружение FK и генерацию cascade_from} {--no-faker : Пропустить обнаружение персональных данных} {--no-split : Генерировать единый YAML без разделения по схемам}';
+    protected $signature = 'dbdump:prepare-config {mode : Режим: all, schema=<name>, table=<schema.table>, new} {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения} {--no-cascade : Пропустить обнаружение FK и генерацию cascade_from} {--no-faker : Пропустить обнаружение персональных данных} {--no-split : Генерировать единый YAML без разделения по схемам}';
 
     /** @var string */
     protected $description = 'Автоматическая генерация dump_config.yaml на основе структуры БД';
@@ -21,10 +21,18 @@ class PrepareConfigCommand extends Command
 Таблицы с количеством строк <= threshold попадают в full_export,
 остальные — в partial_export с лимитом.
 
+Режимы:
+  all           Полная регенерация конфигурации (перезаписывает файл)
+  schema=<name> Перегенерация одной схемы, мёрж в существующий конфиг
+  table=<s.t>   Перегенерация одной таблицы (schema.table), мёрж в существующий конфиг
+  new           Обнаружение и дописывание новых таблиц (не затрагивает существующие)
+
 Примеры:
-  php artisan dbdump:prepare-config                  Генерация с порогом по умолчанию (500 строк)
-  php artisan dbdump:prepare-config --threshold=1000 Установить порог 1000 строк
-  php artisan dbdump:prepare-config --force          Перезаписать без подтверждения
+  php artisan dbdump:prepare-config all                        Полная регенерация
+  php artisan dbdump:prepare-config all --threshold=1000       Порог 1000 строк
+  php artisan dbdump:prepare-config schema=billing             Перегенерировать схему billing
+  php artisan dbdump:prepare-config table=public.users         Перегенерировать таблицу public.users
+  php artisan dbdump:prepare-config new                        Добавить новые таблицы
 HELP;
 
     /** @var ConfigGenerator */
@@ -50,6 +58,15 @@ HELP;
 
         $this->info('Генерация dump_config.yaml');
 
+        /** @var string $modeArg */
+        $modeArg = $this->argument('mode');
+        $parsed = $this->parseMode($modeArg);
+
+        if ($parsed === null) {
+            $this->error("Неизвестный режим: {$modeArg}. Допустимые: all, schema=<name>, table=<schema.table>, new");
+            return self::FAILURE;
+        }
+
         /** @var string $thresholdValue */
         $thresholdValue = $this->option('threshold');
         $threshold = (int) $thresholdValue;
@@ -59,14 +76,16 @@ HELP;
             return self::FAILURE;
         }
 
-        $force = $this->option('force');
-
-        if (!$force && file_exists($this->configPath)) {
-            /** @var bool $confirmed */
-            $confirmed = $this->confirm("Файл {$this->configPath} уже существует. Перезаписать?", false);
-            if (!$confirmed) {
-                $this->warn('Отменено');
-                return self::SUCCESS;
+        // Подтверждение перезаписи только для режима all
+        if ($parsed['mode'] === ConfigGenerator::MODE_ALL) {
+            $force = $this->option('force');
+            if (!$force && file_exists($this->configPath)) {
+                /** @var bool $confirmed */
+                $confirmed = $this->confirm("Файл {$this->configPath} уже существует. Перезаписать?", false);
+                if (!$confirmed) {
+                    $this->warn('Отменено');
+                    return self::SUCCESS;
+                }
             }
         }
 
@@ -81,9 +100,11 @@ HELP;
                 $this->generator->setSplitBySchema(false);
             }
 
+            $this->line("Режим: {$modeArg}");
             $this->line("Порог строк: {$threshold}");
             $this->line("Путь: {$this->configPath}");
 
+            $this->generator->setMode($parsed['mode'], $parsed['scope']);
             $stats = $this->generator->generate($this->configPath, $threshold);
 
             $this->info(sprintf(
@@ -104,6 +125,38 @@ HELP;
 
             return self::FAILURE;
         }
+    }
+
+    /**
+     * @return array{mode: string, scope: string|null}|null
+     */
+    private function parseMode(string $arg): ?array
+    {
+        if ($arg === 'all') {
+            return ['mode' => ConfigGenerator::MODE_ALL, 'scope' => null];
+        }
+
+        if ($arg === 'new') {
+            return ['mode' => ConfigGenerator::MODE_NEW, 'scope' => null];
+        }
+
+        if (strpos($arg, 'schema=') === 0) {
+            $scope = substr($arg, 7);
+            if ($scope === '' || $scope === false) {
+                return null;
+            }
+            return ['mode' => ConfigGenerator::MODE_SCHEMA, 'scope' => $scope];
+        }
+
+        if (strpos($arg, 'table=') === 0) {
+            $scope = substr($arg, 6);
+            if ($scope === '' || $scope === false || strpos($scope, '.') === false) {
+                return null;
+            }
+            return ['mode' => ConfigGenerator::MODE_TABLE, 'scope' => $scope];
+        }
+
+        return null;
     }
 
     private function setupLogger(): void

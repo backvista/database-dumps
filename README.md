@@ -350,22 +350,37 @@ php artisan dbdump:export all --connection=all
 
 ### Автогенерация конфигурации
 
-Команда `prepare-config` смотрит на структуру БД и сама создаёт `dump_config.yaml`:
+Команда `prepare-config` смотрит на структуру БД и создаёт или обновляет `dump_config.yaml`. Обязательный аргумент `mode` определяет область действия:
 
 ```bash
 # Symfony
-php bin/console app:dbdump:prepare-config
+php bin/console app:dbdump:prepare-config all                    # Полная регенерация
+php bin/console app:dbdump:prepare-config schema=billing         # Перегенерировать одну схему
+php bin/console app:dbdump:prepare-config table=public.users     # Перегенерировать одну таблицу
+php bin/console app:dbdump:prepare-config new                    # Добавить только новые таблицы
 
 # Laravel
-php artisan dbdump:prepare-config
+php artisan dbdump:prepare-config all
+php artisan dbdump:prepare-config schema=billing
+php artisan dbdump:prepare-config table=public.users
+php artisan dbdump:prepare-config new
 ```
+
+**Режимы:**
+
+| Режим | Описание |
+|-------|----------|
+| `all` | Полная регенерация конфигурации (перезаписывает файл) |
+| `schema=<name>` | Перегенерация одной схемы, мёрж в существующий конфиг |
+| `table=<schema.table>` | Перегенерация одной таблицы, мёрж в существующий конфиг |
+| `new` | Обнаружение и дописывание новых таблиц (не затрагивает существующие) |
 
 **Опции:**
 
 | Опция | Описание | По умолчанию |
 |-------|----------|-------------|
 | `--threshold`, `-t` | Порог строк: таблицы с количеством строк <= порога идут в full_export, больше — в partial_export | 500 |
-| `--force`, `-f` | Перезаписать файл без подтверждения | — |
+| `--force`, `-f` | Перезаписать файл без подтверждения (только для режима `all`) | — |
 | `--no-cascade` | Пропустить обнаружение FK и генерацию `cascade_from` | — |
 | `--no-faker` | Пропустить обнаружение персональных данных | — |
 | `--no-split` | Генерировать единый YAML без разделения по схемам | — |
@@ -446,9 +461,11 @@ php bin/console app:dbdump:import --connection=all
 php bin/console app:dbdump:export all --no-cascade --no-faker
 
 # Сгенерировать конфигурацию по структуре БД
-php bin/console app:dbdump:prepare-config
-php bin/console app:dbdump:prepare-config --threshold=1000 --force
-php bin/console app:dbdump:prepare-config --no-cascade --no-faker --no-split
+php bin/console app:dbdump:prepare-config all
+php bin/console app:dbdump:prepare-config all --threshold=1000 --force
+php bin/console app:dbdump:prepare-config schema=billing
+php bin/console app:dbdump:prepare-config table=public.users
+php bin/console app:dbdump:prepare-config new --no-cascade --no-faker
 ```
 
 ## Настройка Laravel
@@ -509,9 +526,11 @@ php artisan dbdump:import --connection=all
 php artisan dbdump:export all --no-cascade --no-faker
 
 # Сгенерировать конфигурацию по структуре БД
-php artisan dbdump:prepare-config
-php artisan dbdump:prepare-config --threshold=1000 --force
-php artisan dbdump:prepare-config --no-cascade --no-faker --no-split
+php artisan dbdump:prepare-config all
+php artisan dbdump:prepare-config all --threshold=1000 --force
+php artisan dbdump:prepare-config schema=billing
+php artisan dbdump:prepare-config table=public.users
+php artisan dbdump:prepare-config new --no-cascade --no-faker
 ```
 
 ## Скрипты before/after
@@ -1071,22 +1090,37 @@ php artisan dbdump:export all --connection=all
 
 ### Auto-generate Configuration
 
-The `prepare-config` command looks at your DB structure and creates `dump_config.yaml` for you:
+The `prepare-config` command looks at your DB structure and creates or updates `dump_config.yaml`. The required `mode` argument defines the scope:
 
 ```bash
 # Symfony
-php bin/console app:dbdump:prepare-config
+php bin/console app:dbdump:prepare-config all                    # Full regeneration
+php bin/console app:dbdump:prepare-config schema=billing         # Regenerate one schema
+php bin/console app:dbdump:prepare-config table=public.users     # Regenerate one table
+php bin/console app:dbdump:prepare-config new                    # Add only new tables
 
 # Laravel
-php artisan dbdump:prepare-config
+php artisan dbdump:prepare-config all
+php artisan dbdump:prepare-config schema=billing
+php artisan dbdump:prepare-config table=public.users
+php artisan dbdump:prepare-config new
 ```
+
+**Modes:**
+
+| Mode | Description |
+|------|-------------|
+| `all` | Full config regeneration (overwrites file) |
+| `schema=<name>` | Regenerate one schema, merge into existing config |
+| `table=<schema.table>` | Regenerate one table, merge into existing config |
+| `new` | Detect and append new tables only (doesn't touch existing entries) |
 
 **Options:**
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--threshold`, `-t` | Row threshold: tables with rows <= threshold go to full_export, more — to partial_export | 500 |
-| `--force`, `-f` | Overwrite file without asking | — |
+| `--force`, `-f` | Overwrite file without asking (only for `all` mode) | — |
 | `--no-cascade` | Skip FK detection and `cascade_from` generation | — |
 | `--no-faker` | Skip personal data detection | — |
 | `--no-split` | Generate a single YAML without splitting by schema | — |
@@ -1167,9 +1201,11 @@ php bin/console app:dbdump:import --connection=all
 php bin/console app:dbdump:export all --no-cascade --no-faker
 
 # Generate config from DB structure
-php bin/console app:dbdump:prepare-config
-php bin/console app:dbdump:prepare-config --threshold=1000 --force
-php bin/console app:dbdump:prepare-config --no-cascade --no-faker --no-split
+php bin/console app:dbdump:prepare-config all
+php bin/console app:dbdump:prepare-config all --threshold=1000 --force
+php bin/console app:dbdump:prepare-config schema=billing
+php bin/console app:dbdump:prepare-config table=public.users
+php bin/console app:dbdump:prepare-config new --no-cascade --no-faker
 ```
 
 ## Laravel Setup
@@ -1230,9 +1266,11 @@ php artisan dbdump:import --connection=all
 php artisan dbdump:export all --no-cascade --no-faker
 
 # Generate config from DB structure
-php artisan dbdump:prepare-config
-php artisan dbdump:prepare-config --threshold=1000 --force
-php artisan dbdump:prepare-config --no-cascade --no-faker --no-split
+php artisan dbdump:prepare-config all
+php artisan dbdump:prepare-config all --threshold=1000 --force
+php artisan dbdump:prepare-config schema=billing
+php artisan dbdump:prepare-config table=public.users
+php artisan dbdump:prepare-config new --no-cascade --no-faker
 ```
 
 ## Before/After Scripts
