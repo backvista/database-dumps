@@ -245,6 +245,98 @@ class PatternDetectorTest extends TestCase
         $this->assertArrayNotHasKey('some_field', $result);
     }
 
+    public function testDetectsGenderMaleFemale(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['gender' => $i % 2 === 0 ? 'Male' : 'Female', 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('gender', $result);
+        $this->assertEquals(PatternDetector::PATTERN_GENDER, $result['gender']);
+    }
+
+    public function testDetectsGenderMF(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['sex' => $i % 2 === 0 ? 'M' : 'F', 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('sex', $result);
+        $this->assertEquals(PatternDetector::PATTERN_GENDER, $result['sex']);
+    }
+
+    public function testDetectsGenderCyrillicMZh(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['пол' => $i % 2 === 0 ? 'м' : 'ж', 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('пол', $result);
+        $this->assertEquals(PatternDetector::PATTERN_GENDER, $result['пол']);
+    }
+
+    public function testDetectsGenderRussianWords(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['gender' => $i % 2 === 0 ? 'мужчина' : 'женщина', 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('gender', $result);
+        $this->assertEquals(PatternDetector::PATTERN_GENDER, $result['gender']);
+    }
+
+    public function testGenderNotDetectedWithoutColumnNameMatch(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['some_field' => $i % 2 === 0 ? 'Male' : 'Female', 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayNotHasKey('some_field', $result);
+    }
+
+    public function testGenderNotDetectedWithWrongValues(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['gender' => "value{$i}", 'id' => $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayNotHasKey('gender', $result);
+    }
+
+    public function testGenderBelowThreshold(): void
+    {
+        $rows = [];
+        // 15 из 20 = 75% < 80% порога
+        for ($i = 0; $i < 15; $i++) {
+            $rows[] = ['gender' => $i % 2 === 0 ? 'Male' : 'Female', 'id' => $i];
+        }
+        for ($i = 0; $i < 5; $i++) {
+            $rows[] = ['gender' => "garbage{$i}", 'id' => 15 + $i];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayNotHasKey('gender', $result);
+    }
+
     public function testDetectsLinkedByColumnNameHeuristic(): void
     {
         $rows = [];

@@ -296,6 +296,112 @@ class RussianFakerTest extends TestCase
         $this->assertEquals($nameParts[1], $result[0]['first_name']);
     }
 
+    public function testApplyGender(): void
+    {
+        $rows = [['id' => 1, 'gender' => 'Male']];
+        $result = $this->faker->apply('public', 'users', ['gender' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['gender'], ['Male', 'Female']);
+    }
+
+    public function testApplyGenderMF(): void
+    {
+        $rows = [['id' => 1, 'sex' => 'M']];
+        $result = $this->faker->apply('public', 'users', ['sex' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['sex'], ['M', 'F']);
+    }
+
+    public function testApplyGenderCyrillic(): void
+    {
+        $rows = [['id' => 1, 'sex' => 'м']];
+        $result = $this->faker->apply('public', 'users', ['sex' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['sex'], ['м', 'ж']);
+    }
+
+    public function testApplyGenderRussianWords(): void
+    {
+        $rows = [['id' => 1, 'gender' => 'мужчина']];
+        $result = $this->faker->apply('public', 'users', ['gender' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['gender'], ['мужчина', 'женщина']);
+    }
+
+    public function testGenderCasePreservation(): void
+    {
+        // Проверяем 3 регистра для латиницы
+        $rows = [
+            ['id' => 1, 'g' => 'MALE'],
+            ['id' => 2, 'g' => 'Male'],
+            ['id' => 3, 'g' => 'male'],
+        ];
+        $result = $this->faker->apply('public', 'users', ['g' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['g'], ['MALE', 'FEMALE']);
+        $this->assertContains($result[1]['g'], ['Male', 'Female']);
+        $this->assertContains($result[2]['g'], ['male', 'female']);
+    }
+
+    public function testGenderCasePreservationCyrillic(): void
+    {
+        $rows = [
+            ['id' => 1, 'g' => 'М'],
+            ['id' => 2, 'g' => 'м'],
+        ];
+        $result = $this->faker->apply('public', 'users', ['g' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertContains($result[0]['g'], ['М', 'Ж']);
+        $this->assertContains($result[1]['g'], ['м', 'ж']);
+    }
+
+    public function testGenderConsistentWithNameInRow(): void
+    {
+        $fakerConfig = [
+            'full_name' => PatternDetector::PATTERN_FIO,
+            'gender' => PatternDetector::PATTERN_GENDER,
+        ];
+        $rows = [
+            ['id' => 1, 'full_name' => 'Тестов Тест Тестович', 'gender' => 'male'],
+        ];
+        $result = $this->faker->apply('public', 'users', $fakerConfig, $rows);
+
+        $fioParts = explode(' ', $result[0]['full_name']);
+        $isMaleName = mb_substr($fioParts[2], -2) === 'ич'; // отчество на -ич = мужское
+
+        if ($isMaleName) {
+            $this->assertEquals('male', $result[0]['gender']);
+        } else {
+            $this->assertEquals('female', $result[0]['gender']);
+        }
+    }
+
+    public function testGenderDeterminism(): void
+    {
+        $rows = [['id' => 1, 'gender' => 'Male']];
+        $config = ['gender' => PatternDetector::PATTERN_GENDER];
+        $r1 = $this->faker->apply('public', 'users', $config, $rows);
+        $r2 = $this->faker->apply('public', 'users', $config, $rows);
+
+        $this->assertEquals($r1[0]['gender'], $r2[0]['gender']);
+    }
+
+    public function testGenderNullPreservation(): void
+    {
+        $rows = [['id' => 1, 'gender' => null]];
+        $result = $this->faker->apply('public', 'users', ['gender' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertNull($result[0]['gender']);
+    }
+
+    public function testGenderUnrecognizedFallback(): void
+    {
+        $rows = [['id' => 1, 'gender' => '1']];
+        $result = $this->faker->apply('public', 'users', ['gender' => PatternDetector::PATTERN_GENDER], $rows);
+
+        $this->assertEquals('1', $result[0]['gender']);
+    }
+
     public function testFioWithAllLinkedComponents(): void
     {
         $fakerConfig = [

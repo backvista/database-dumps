@@ -129,6 +129,22 @@ class RussianFaker implements FakerInterface
     /** @var array<string> */
     private const EMAIL_DOMAINS = ['example.com', 'test.ru', 'mail.test', 'demo.org'];
 
+    /** @var array<string, array<string>> Карта форматов гендера: lowercase → [male_variant, female_variant] */
+    private const GENDER_MAP = [
+        'male' => ['male', 'female'],
+        'female' => ['male', 'female'],
+        'm' => ['m', 'f'],
+        'f' => ['m', 'f'],
+        'м' => ['м', 'ж'],
+        'ж' => ['м', 'ж'],
+        'мужской' => ['мужской', 'женский'],
+        'женский' => ['мужской', 'женский'],
+        'муж' => ['муж', 'жен'],
+        'жен' => ['муж', 'жен'],
+        'мужчина' => ['мужчина', 'женщина'],
+        'женщина' => ['мужчина', 'женщина'],
+    ];
+
     /** @var array<string, string> */
     private const TRANSLIT_MAP = [
         'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'yo',
@@ -199,6 +215,9 @@ class RussianFaker implements FakerInterface
                     case PatternDetector::PATTERN_PATRONYMIC:
                         $row[$column] = $patronymic;
                         break;
+                    case PatternDetector::PATTERN_GENDER:
+                        $row[$column] = $this->generateGender($gender, (string) $row[$column]);
+                        break;
                 }
             }
         }
@@ -256,6 +275,36 @@ class RussianFaker implements FakerInterface
         }
 
         return $result;
+    }
+
+    /** Генерирует замену значения пола, сохраняя формат и регистр оригинала. */
+    private function generateGender(int $gender, string $originalValue): string
+    {
+        $normalized = mb_strtolower(trim($originalValue));
+
+        if (!isset(self::GENDER_MAP[$normalized])) {
+            return $originalValue;
+        }
+
+        $pair = self::GENDER_MAP[$normalized];
+        $replacement = $pair[$gender];
+
+        return $this->matchCase($replacement, trim($originalValue));
+    }
+
+    /** Приводит регистр $value к регистру $reference. */
+    private function matchCase(string $value, string $reference): string
+    {
+        if (mb_strlen($reference) > 1 && mb_strtoupper($reference) === $reference) {
+            return mb_strtoupper($value);
+        }
+
+        $firstChar = mb_substr($reference, 0, 1);
+        if (mb_strtoupper($firstChar) === $firstChar) {
+            return mb_strtoupper(mb_substr($value, 0, 1)) . mb_substr($value, 1);
+        }
+
+        return $value;
     }
 
     /** Транслитерирует кириллический текст в латиницу. */

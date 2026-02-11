@@ -26,6 +26,8 @@ class PatternDetector
     public const PATTERN_LASTNAME = 'lastname';
     /** @var string Отчество (одиночное, определяется кросс-корреляцией) */
     public const PATTERN_PATRONYMIC = 'patronymic';
+    /** @var string Пол/гендер (определяется по имени колонки + значениям) */
+    public const PATTERN_GENDER = 'gender';
 
     /** @var int Размер выборки для анализа */
     public const SAMPLE_SIZE = 200;
@@ -55,6 +57,17 @@ class PatternDetector
     private const COLUMN_HINTS_LASTNAME = ['/last_?name/i', '/lname/i', '/surname/i', '/family/i', '/фамилия/ui'];
     /** @var array<string> Подсказки по имени колонки: отчество */
     private const COLUMN_HINTS_PATRONYMIC = ['/patronym/i', '/middle_?name/i', '/отчество/ui'];
+    /** @var array<string> Подсказки по имени колонки: пол */
+    private const COLUMN_HINTS_GENDER = ['/gender/i', '/^gen$/i', '/^sex$/i', '/^пол$/ui'];
+
+    /** @var array<string> Допустимые значения пола (lowercase) */
+    private const GENDER_VALUES = [
+        'male', 'female', 'm', 'f',
+        'м', 'ж',
+        'мужской', 'женский',
+        'муж', 'жен',
+        'мужчина', 'женщина',
+    ];
 
     /** @var ConnectionRegistryInterface */
     private $registry;
@@ -106,6 +119,7 @@ class PatternDetector
         }
 
         $detected = $this->detectLinkedColumns($rows, $detected);
+        $detected = $this->detectGenderColumns($rows, $detected);
 
         return $detected;
     }
@@ -232,6 +246,68 @@ class PatternDetector
                     $detected[$column] = $this->classifyNameRole($column, $values);
                     break;
                 }
+            }
+        }
+
+        return $detected;
+    }
+
+    /**
+     * Обнаруживает колонки пола по совпадению имени колонки И значений.
+     *
+     * @param array<array<string, mixed>> $rows
+     * @param array<string, string> $detected
+     * @return array<string, string>
+     */
+    private function detectGenderColumns(array $rows, array $detected): array
+    {
+        if (empty($rows)) {
+            return $detected;
+        }
+
+        $columns = array_keys($rows[0]);
+
+        foreach ($columns as $column) {
+            if (isset($detected[$column])) {
+                continue;
+            }
+
+            // Проверка имени колонки
+            $columnMatches = false;
+            foreach (self::COLUMN_HINTS_GENDER as $regex) {
+                if (preg_match($regex, $column)) {
+                    $columnMatches = true;
+                    break;
+                }
+            }
+
+            if (!$columnMatches) {
+                continue;
+            }
+
+            // Собрать непустые значения
+            $values = [];
+            foreach ($rows as $row) {
+                if ($row[$column] !== null && $row[$column] !== '') {
+                    $values[] = (string) $row[$column];
+                }
+            }
+
+            if (count($values) < 10) {
+                continue;
+            }
+
+            // Проверка значений
+            $matchCount = 0;
+            foreach ($values as $value) {
+                $normalized = mb_strtolower(trim($value));
+                if (in_array($normalized, self::GENDER_VALUES, true)) {
+                    $matchCount++;
+                }
+            }
+
+            if (($matchCount / count($values)) >= self::DETECTION_THRESHOLD) {
+                $detected[$column] = self::PATTERN_GENDER;
             }
         }
 
