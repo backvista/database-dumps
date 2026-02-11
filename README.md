@@ -233,6 +233,7 @@ partial_export:
 |---------|----------|------------------|---------------|
 | `fio` | ФИО полностью | Иванов Иван Иванович | Петров Александр Сергеевич |
 | `fio_short` | ФИО сокращённо | Иванов И.И. | Козлов А.В. |
+| `name` | Фамилия Имя | Иванов Иван | Петров Александр |
 | `email` | Email | ivan@company.ru | aleksandr.petrov42@example.com |
 | `phone` | Телефон | +79161234567 | 79234567890 |
 
@@ -243,6 +244,7 @@ faker:
   public:
     users:
       full_name: fio
+      display_name: name
       email: email
       phone: phone
     employees:
@@ -253,7 +255,7 @@ faker:
 
 Команда `prepare-config` автоматически анализирует содержимое таблиц и генерирует секцию `faker`, если в колонках обнаруживаются паттерны ПД (порог совпадения: 80% из 200 случайных строк). Чтобы отключить: `--no-faker`.
 
-Замена детерминирована — одна и та же таблица всегда даёт одинаковый результат (seed основан на имени таблицы и первой строке данных).
+Замена детерминирована — одно и то же значение всегда даёт одинаковую замену независимо от таблицы и запуска (seed основан на хеше конкретного значения ячейки).
 
 ### Разделение конфига по схемам (includes)
 
@@ -952,6 +954,7 @@ The package can automatically detect and replace personal data during export. Th
 |---------|-------------|------------------|---------------------|
 | `fio` | Full Russian name | Иванов Иван Иванович | Петров Александр Сергеевич |
 | `fio_short` | Short Russian name | Иванов И.И. | Козлов А.В. |
+| `name` | First and last name | Иванов Иван | Петров Александр |
 | `email` | Email address | ivan@company.ru | aleksandr.petrov42@example.com |
 | `phone` | Phone number | +79161234567 | 79234567890 |
 
@@ -962,6 +965,7 @@ faker:
   public:
     users:
       full_name: fio
+      display_name: name
       email: email
       phone: phone
     employees:
@@ -972,7 +976,7 @@ faker:
 
 The `prepare-config` command automatically analyzes table contents and generates the `faker` section when PII patterns are detected in columns (threshold: 80% match from 200 random rows). To disable: `--no-faker`.
 
-Replacement is deterministic — the same table always produces the same result (seed is based on table name and first data row).
+Replacement is deterministic — the same input value always produces the same replacement regardless of the table or run (seed is based on the hash of the specific cell value).
 
 ### Config Splitting by Schema (includes)
 

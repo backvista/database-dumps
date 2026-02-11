@@ -116,6 +116,26 @@ class PatternDetectorTest extends TestCase
         $this->assertArrayNotHasKey('email', $result);
     }
 
+    public function testDetectsNamePattern(): void
+    {
+        $rows = [];
+        $names = [
+            'Иванов Иван', 'Петрова Мария', 'Сидоров Алексей', 'Козлова Елена',
+            'Новиков Дмитрий', 'Морозова Ольга', 'Волков Сергей', 'Лебедева Анна',
+            'Семёнов Артём', 'Егорова Наталья', 'Павлов Роман', 'Орлова Юлия',
+            'Андреев Максим', 'Макарова Ирина', 'Никитин Кирилл', 'Захарова Татьяна',
+            'Зайцев Денис', 'Борисова Светлана', 'Яковлев Олег', 'Григорьева Екатерина',
+        ];
+        foreach ($names as $name) {
+            $rows[] = ['display_name' => $name];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('display_name', $result);
+        $this->assertEquals(PatternDetector::PATTERN_NAME, $result['display_name']);
+    }
+
     public function testEmptyTable(): void
     {
         $this->connection->method('fetchAllAssociative')->willReturn([]);

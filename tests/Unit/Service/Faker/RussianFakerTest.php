@@ -74,6 +74,18 @@ class RussianFakerTest extends TestCase
         $this->assertNull($result[0]['full_name']);
     }
 
+    public function testApplyName(): void
+    {
+        $rows = [
+            ['id' => 1, 'display_name' => 'Тестов Тест'],
+        ];
+        $result = $this->faker->apply('public', 'users', ['display_name' => PatternDetector::PATTERN_NAME], $rows);
+
+        $this->assertNotEquals('Тестов Тест', $result[0]['display_name']);
+        // Should be 2 Cyrillic words
+        $this->assertMatchesRegularExpression('/^[А-ЯЁа-яё]+ [А-ЯЁа-яё]+$/u', $result[0]['display_name']);
+    }
+
     public function testDeterminism(): void
     {
         $rows = [
@@ -81,6 +93,17 @@ class RussianFakerTest extends TestCase
         ];
         $result1 = $this->faker->apply('public', 'users', ['full_name' => PatternDetector::PATTERN_FIO], $rows);
         $result2 = $this->faker->apply('public', 'users', ['full_name' => PatternDetector::PATTERN_FIO], $rows);
+
+        $this->assertEquals($result1[0]['full_name'], $result2[0]['full_name']);
+    }
+
+    public function testDeterminismAcrossTables(): void
+    {
+        $rows = [
+            ['id' => 1, 'full_name' => 'Оригинал Оригиналов Оригиналович'],
+        ];
+        $result1 = $this->faker->apply('public', 'users', ['full_name' => PatternDetector::PATTERN_FIO], $rows);
+        $result2 = $this->faker->apply('other_schema', 'employees', ['full_name' => PatternDetector::PATTERN_FIO], $rows);
 
         $this->assertEquals($result1[0]['full_name'], $result2[0]['full_name']);
     }

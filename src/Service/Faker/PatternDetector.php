@@ -4,24 +4,38 @@ namespace BackVista\DatabaseDumps\Service\Faker;
 
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 
+/**
+ * Определяет паттерны персональных данных в колонках таблицы
+ * по выборке случайных строк (порог совпадения 80%).
+ */
 class PatternDetector
 {
+    /** @var string Фамилия Имя Отчество (3 кириллических слова) */
     public const PATTERN_FIO = 'fio';
+    /** @var string Фамилия И.О. (сокращённое ФИО с инициалами) */
     public const PATTERN_FIO_SHORT = 'fio_short';
+    /** @var string Фамилия Имя (2 кириллических слова) */
+    public const PATTERN_NAME = 'name';
+    /** @var string Email-адрес */
     public const PATTERN_EMAIL = 'email';
+    /** @var string Телефонный номер */
     public const PATTERN_PHONE = 'phone';
 
+    /** @var int Размер выборки для анализа */
     public const SAMPLE_SIZE = 200;
+    /** @var float Минимальная доля совпадений для детекции (80%) */
     public const DETECTION_THRESHOLD = 0.80;
 
     /** @var string */
     private const REGEX_EMAIL = '/^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$/u';
     /** @var string */
     private const REGEX_PHONE = '/^(?:\\+?[78])?[9]\\d{9}$/';
-    /** @var string */
+    /** @var string 3 кириллических слова (с поддержкой дефиса) */
     private const REGEX_FIO = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?$/u';
-    /** @var string */
+    /** @var string Фамилия + 2 инициала с точками */
     private const REGEX_FIO_SHORT = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁ]\\.\\s?[А-ЯЁ]\\.$/u';
+    /** @var string 2 кириллических слова (с поддержкой дефиса) */
+    private const REGEX_NAME = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?$/u';
 
     /** @var ConnectionRegistryInterface */
     private $registry;
@@ -32,7 +46,7 @@ class PatternDetector
     }
 
     /**
-     * Detect sensitive data patterns in table columns.
+     * Анализирует колонки таблицы и возвращает обнаруженные паттерны ПД.
      *
      * @return array<string, string> column_name => pattern_type
      */
@@ -76,7 +90,10 @@ class PatternDetector
     }
 
     /**
-     * @param array<string> $values non-null column values
+     * Определяет паттерн ПД по массиву значений колонки.
+     * Возвращает первый паттерн, превысивший порог совпадения.
+     *
+     * @param array<string> $values непустые значения колонки
      */
     private function detectColumnPattern(array $values): ?string
     {
@@ -86,6 +103,7 @@ class PatternDetector
             self::PATTERN_PHONE => null,  // special handling
             self::PATTERN_FIO => self::REGEX_FIO,
             self::PATTERN_FIO_SHORT => self::REGEX_FIO_SHORT,
+            self::PATTERN_NAME => self::REGEX_NAME,
         ];
 
         foreach ($patterns as $patternName => $regex) {

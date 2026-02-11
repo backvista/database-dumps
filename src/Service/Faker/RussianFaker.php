@@ -4,6 +4,10 @@ namespace BackVista\DatabaseDumps\Service\Faker;
 
 use BackVista\DatabaseDumps\Contract\FakerInterface;
 
+/**
+ * Заменяет персональные данные на сгенерированные русские ФИО, email, телефоны.
+ * Детерминирован: одно и то же входное значение всегда даёт одинаковую замену (seed по хешу значения).
+ */
 class RussianFaker implements FakerInterface
 {
     /** @var array<string> */
@@ -135,6 +139,9 @@ class RussianFaker implements FakerInterface
     ];
 
     /**
+     * Заменяет ПД в строках данных согласно fakerConfig.
+     * Seed привязан к конкретному значению ячейки, а не к таблице.
+     *
      * @inheritDoc
      */
     public function apply(string $schema, string $table, array $fakerConfig, array $rows): array
@@ -143,35 +150,34 @@ class RussianFaker implements FakerInterface
             return $rows;
         }
 
-        // Deterministic seed per table
-        mt_srand(crc32($schema . '.' . $table . md5(serialize($rows[0]))));
-
-        foreach ($rows as $rowIndex => &$row) {
-            // Generate one identity per row
-            $gender = mt_rand(0, 1); // 0=male, 1=female
-
-            $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
-            $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
-            $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
-
-            $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
-            $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
-            $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
-
-            $fullFio = $lastName . ' ' . $firstName . ' ' . $patronymic;
-            $shortFio = $lastName . ' ' . mb_substr($firstName, 0, 1) . '.' . mb_substr($patronymic, 0, 1) . '.';
-
+        foreach ($rows as &$row) {
             foreach ($fakerConfig as $column => $patternType) {
                 if (!isset($row[$column])) {
                     continue;
                 }
 
+                // Deterministic seed per value
+                mt_srand(crc32((string) $row[$column]));
+
+                $gender = mt_rand(0, 1); // 0=male, 1=female
+
+                $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
+                $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
+                $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
+
+                $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
+                $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
+                $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
+
                 switch ($patternType) {
                     case PatternDetector::PATTERN_FIO:
-                        $row[$column] = $fullFio;
+                        $row[$column] = $lastName . ' ' . $firstName . ' ' . $patronymic;
                         break;
                     case PatternDetector::PATTERN_FIO_SHORT:
-                        $row[$column] = $shortFio;
+                        $row[$column] = $lastName . ' ' . mb_substr($firstName, 0, 1) . '.' . mb_substr($patronymic, 0, 1) . '.';
+                        break;
+                    case PatternDetector::PATTERN_NAME:
+                        $row[$column] = $lastName . ' ' . $firstName;
                         break;
                     case PatternDetector::PATTERN_EMAIL:
                         $row[$column] = $this->generateEmail($firstName, $lastName);
@@ -187,6 +193,7 @@ class RussianFaker implements FakerInterface
         return $rows;
     }
 
+    /** Генерирует email из транслитерированных имени и фамилии. */
     private function generateEmail(string $firstName, string $lastName): string
     {
         $translitFirst = $this->transliterate(mb_strtolower($firstName));
@@ -197,11 +204,13 @@ class RussianFaker implements FakerInterface
         return $translitFirst . '.' . $translitLast . $num . '@' . $domain;
     }
 
+    /** Генерирует российский мобильный номер (79xxxxxxxxx). */
     private function generatePhone(): string
     {
         return '79' . str_pad((string) mt_rand(0, 999999999), 9, '0', STR_PAD_LEFT);
     }
 
+    /** Транслитерирует кириллический текст в латиницу. */
     private function transliterate(string $text): string
     {
         return strtr($text, self::TRANSLIT_MAP);
