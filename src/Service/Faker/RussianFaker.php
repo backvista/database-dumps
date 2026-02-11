@@ -6,7 +6,7 @@ use BackVista\DatabaseDumps\Contract\FakerInterface;
 
 /**
  * Заменяет персональные данные на сгенерированные русские ФИО, email, телефоны.
- * Детерминирован: одно и то же входное значение всегда даёт одинаковую замену (seed по хешу значения).
+ * Детерминирован: seed по хешу комбинации всех faker-значений строки.
  */
 class RussianFaker implements FakerInterface
 {
@@ -140,7 +140,7 @@ class RussianFaker implements FakerInterface
 
     /**
      * Заменяет ПД в строках данных согласно fakerConfig.
-     * Seed привязан к конкретному значению ячейки, а не к таблице.
+     * Seed привязан к комбинации всех faker-значений строки, а не к отдельной ячейке.
      *
      * @inheritDoc
      */
@@ -151,23 +151,28 @@ class RussianFaker implements FakerInterface
         }
 
         foreach ($rows as &$row) {
+            // Комбинированный seed от всех faker-значений строки
+            $seedParts = [];
+            foreach ($fakerConfig as $column => $patternType) {
+                $seedParts[] = isset($row[$column]) ? (string) $row[$column] : '';
+            }
+            mt_srand(crc32(implode("\0", $seedParts)));
+
+            // Один «человек» на строку
+            $gender = mt_rand(0, 1); // 0=male, 1=female
+
+            $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
+            $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
+            $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
+
+            $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
+            $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
+            $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
+
             foreach ($fakerConfig as $column => $patternType) {
                 if (!isset($row[$column])) {
                     continue;
                 }
-
-                // Deterministic seed per value
-                mt_srand(crc32((string) $row[$column]));
-
-                $gender = mt_rand(0, 1); // 0=male, 1=female
-
-                $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
-                $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
-                $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
-
-                $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
-                $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
-                $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
 
                 switch ($patternType) {
                     case PatternDetector::PATTERN_FIO:
