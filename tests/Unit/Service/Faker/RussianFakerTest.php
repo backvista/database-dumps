@@ -251,4 +251,74 @@ class RussianFakerTest extends TestCase
         $r2 = $this->faker->apply('public', 'users', $config, $rows);
         $this->assertEquals($r1[0]['phone'], $r2[0]['phone']);
     }
+
+    public function testApplyFirstname(): void
+    {
+        $rows = [['id' => 1, 'first_name' => 'Тест']];
+        $result = $this->faker->apply('public', 'users', ['first_name' => PatternDetector::PATTERN_FIRSTNAME], $rows);
+
+        $this->assertNotEquals('Тест', $result[0]['first_name']);
+        $this->assertMatchesRegularExpression('/^[А-ЯЁа-яё]+$/u', $result[0]['first_name']);
+    }
+
+    public function testApplyLastname(): void
+    {
+        $rows = [['id' => 1, 'surname' => 'Тестов']];
+        $result = $this->faker->apply('public', 'users', ['surname' => PatternDetector::PATTERN_LASTNAME], $rows);
+
+        $this->assertNotEquals('Тестов', $result[0]['surname']);
+        $this->assertMatchesRegularExpression('/^[А-ЯЁа-яё]+$/u', $result[0]['surname']);
+    }
+
+    public function testApplyPatronymic(): void
+    {
+        $rows = [['id' => 1, 'patronymic' => 'Тестович']];
+        $result = $this->faker->apply('public', 'users', ['patronymic' => PatternDetector::PATTERN_PATRONYMIC], $rows);
+
+        $this->assertNotEquals('Тестович', $result[0]['patronymic']);
+        $this->assertMatchesRegularExpression('/^[А-ЯЁа-яё]+$/u', $result[0]['patronymic']);
+    }
+
+    public function testLinkedColumnsConsistentWithComposite(): void
+    {
+        $fakerConfig = [
+            'display_name' => PatternDetector::PATTERN_NAME,
+            'first_name' => PatternDetector::PATTERN_FIRSTNAME,
+            'last_name' => PatternDetector::PATTERN_LASTNAME,
+        ];
+        $rows = [
+            ['id' => 1, 'display_name' => 'Тестов Тест', 'first_name' => 'Тест', 'last_name' => 'Тестов'],
+        ];
+        $result = $this->faker->apply('public', 'users', $fakerConfig, $rows);
+
+        $nameParts = explode(' ', $result[0]['display_name']);
+        $this->assertEquals($nameParts[0], $result[0]['last_name']);
+        $this->assertEquals($nameParts[1], $result[0]['first_name']);
+    }
+
+    public function testFioWithAllLinkedComponents(): void
+    {
+        $fakerConfig = [
+            'full_name' => PatternDetector::PATTERN_FIO,
+            'first_name' => PatternDetector::PATTERN_FIRSTNAME,
+            'last_name' => PatternDetector::PATTERN_LASTNAME,
+            'patronymic' => PatternDetector::PATTERN_PATRONYMIC,
+        ];
+        $rows = [
+            [
+                'id' => 1,
+                'full_name' => 'Тестов Тест Тестович',
+                'first_name' => 'Тест',
+                'last_name' => 'Тестов',
+                'patronymic' => 'Тестович',
+            ],
+        ];
+        $result = $this->faker->apply('public', 'users', $fakerConfig, $rows);
+
+        $fioParts = explode(' ', $result[0]['full_name']);
+        $this->assertCount(3, $fioParts);
+        $this->assertEquals($fioParts[0], $result[0]['last_name']);
+        $this->assertEquals($fioParts[1], $result[0]['first_name']);
+        $this->assertEquals($fioParts[2], $result[0]['patronymic']);
+    }
 }

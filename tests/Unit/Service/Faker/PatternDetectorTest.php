@@ -142,4 +142,128 @@ class PatternDetectorTest extends TestCase
         $result = $this->detector->detect('public', 'users');
         $this->assertEmpty($result);
     }
+
+    public function testDetectsLinkedFirstname(): void
+    {
+        $rows = [];
+        $data = [
+            ['Иванов Иван', 'Иван'], ['Петрова Мария', 'Мария'],
+            ['Сидоров Алексей', 'Алексей'], ['Козлова Елена', 'Елена'],
+            ['Новиков Дмитрий', 'Дмитрий'], ['Морозова Ольга', 'Ольга'],
+            ['Волков Сергей', 'Сергей'], ['Лебедева Анна', 'Анна'],
+            ['Семёнов Артём', 'Артём'], ['Егорова Наталья', 'Наталья'],
+            ['Павлов Роман', 'Роман'], ['Орлова Юлия', 'Юлия'],
+        ];
+        foreach ($data as $item) {
+            $rows[] = ['display_name' => $item[0], 'first_name' => $item[1]];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertEquals(PatternDetector::PATTERN_NAME, $result['display_name']);
+        $this->assertArrayHasKey('first_name', $result);
+        $this->assertEquals(PatternDetector::PATTERN_FIRSTNAME, $result['first_name']);
+    }
+
+    public function testDetectsLinkedLastname(): void
+    {
+        $rows = [];
+        $data = [
+            ['Иванов Иван', 'Иванов'], ['Петрова Мария', 'Петрова'],
+            ['Сидоров Алексей', 'Сидоров'], ['Козлова Елена', 'Козлова'],
+            ['Новиков Дмитрий', 'Новиков'], ['Морозова Ольга', 'Морозова'],
+            ['Волков Сергей', 'Волков'], ['Лебедева Анна', 'Лебедева'],
+            ['Семёнов Артём', 'Семёнов'], ['Егорова Наталья', 'Егорова'],
+            ['Павлов Роман', 'Павлов'], ['Орлова Юлия', 'Орлова'],
+        ];
+        foreach ($data as $item) {
+            $rows[] = ['display_name' => $item[0], 'surname' => $item[1]];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertEquals(PatternDetector::PATTERN_NAME, $result['display_name']);
+        $this->assertArrayHasKey('surname', $result);
+        $this->assertEquals(PatternDetector::PATTERN_LASTNAME, $result['surname']);
+    }
+
+    public function testDetectsLinkedPatronymic(): void
+    {
+        $rows = [];
+        $data = [
+            ['Иванов Иван Иванович', 'Иванович'], ['Петров Пётр Петрович', 'Петрович'],
+            ['Сидоров Сидор Сидорович', 'Сидорович'], ['Козлов Андрей Сергеевич', 'Сергеевич'],
+            ['Новиков Дмитрий Александрович', 'Александрович'], ['Морозов Алексей Николаевич', 'Николаевич'],
+            ['Волков Сергей Владимирович', 'Владимирович'], ['Лебедев Максим Олегович', 'Олегович'],
+            ['Семёнов Артём Денисович', 'Денисович'], ['Егоров Кирилл Игоревич', 'Игоревич'],
+            ['Павлов Роман Андреевич', 'Андреевич'], ['Орлов Даниил Вадимович', 'Вадимович'],
+        ];
+        foreach ($data as $item) {
+            $rows[] = ['full_name' => $item[0], 'middle_name' => $item[1]];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertEquals(PatternDetector::PATTERN_FIO, $result['full_name']);
+        $this->assertArrayHasKey('middle_name', $result);
+        $this->assertEquals(PatternDetector::PATTERN_PATRONYMIC, $result['middle_name']);
+    }
+
+    public function testLinkedColumnBelowThreshold(): void
+    {
+        $rows = [];
+        $data = [
+            ['Иванов Иван', 'Иван'], ['Петрова Мария', 'Мария'],
+            ['Сидоров Алексей', 'Алексей'], ['Козлова Елена', 'Елена'],
+            ['Новиков Дмитрий', 'Дмитрий'], ['Морозова Ольга', 'Ольга'],
+            ['Волков Сергей', 'Сергей'],
+            // Ниже — не совпадают со составной колонкой
+            ['Лебедева Анна', 'Тимур'], ['Семёнов Артём', 'Борис'],
+            ['Егорова Наталья', 'Кирилл'], ['Павлов Роман', 'Дарья'],
+            ['Орлова Юлия', 'Вера'], ['Андреев Максим', 'Пётр'],
+        ];
+        foreach ($data as $item) {
+            $rows[] = ['display_name' => $item[0], 'first_name' => $item[1]];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertEquals(PatternDetector::PATTERN_NAME, $result['display_name']);
+        $this->assertArrayNotHasKey('first_name', $result);
+    }
+
+    public function testNoLinkedColumnsWithoutComposite(): void
+    {
+        $rows = [];
+        for ($i = 0; $i < 20; $i++) {
+            $rows[] = ['email' => "user{$i}@example.com", 'some_field' => 'Иван'];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        $this->assertArrayHasKey('email', $result);
+        $this->assertArrayNotHasKey('some_field', $result);
+    }
+
+    public function testDetectsLinkedByColumnNameHeuristic(): void
+    {
+        $rows = [];
+        // Значения с суффиксами отчеств, но колонка названа lname → приоритет имени колонки
+        $data = [
+            ['Иванов Иван Иванович', 'Иванович'], ['Петров Пётр Петрович', 'Петрович'],
+            ['Сидоров Сидор Сидорович', 'Сидорович'], ['Козлов Андрей Сергеевич', 'Сергеевич'],
+            ['Новиков Дмитрий Александрович', 'Александрович'], ['Морозов Алексей Николаевич', 'Николаевич'],
+            ['Волков Сергей Владимирович', 'Владимирович'], ['Лебедев Максим Олегович', 'Олегович'],
+            ['Семёнов Артём Денисович', 'Денисович'], ['Егоров Кирилл Игоревич', 'Игоревич'],
+            ['Павлов Роман Андреевич', 'Андреевич'], ['Орлов Даниил Вадимович', 'Вадимович'],
+        ];
+        foreach ($data as $item) {
+            $rows[] = ['full_name' => $item[0], 'lname' => $item[1]];
+        }
+        $this->connection->method('fetchAllAssociative')->willReturn($rows);
+
+        $result = $this->detector->detect('public', 'users');
+        // lname → column hint /lname/i → PATTERN_LASTNAME, несмотря на суффиксы отчеств
+        $this->assertEquals(PatternDetector::PATTERN_LASTNAME, $result['lname']);
+    }
 }

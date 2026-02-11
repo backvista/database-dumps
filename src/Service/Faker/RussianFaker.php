@@ -190,6 +190,15 @@ class RussianFaker implements FakerInterface
                     case PatternDetector::PATTERN_PHONE:
                         $row[$column] = $this->generatePhone((string) $row[$column]);
                         break;
+                    case PatternDetector::PATTERN_FIRSTNAME:
+                        $row[$column] = $firstName;
+                        break;
+                    case PatternDetector::PATTERN_LASTNAME:
+                        $row[$column] = $lastName;
+                        break;
+                    case PatternDetector::PATTERN_PATRONYMIC:
+                        $row[$column] = $patronymic;
+                        break;
                 }
             }
         }

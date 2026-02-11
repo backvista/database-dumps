@@ -74,8 +74,8 @@
     },
     "faker_pattern": {
       "type": "string",
-      "enum": ["fio", "fio_short", "name", "email", "phone"],
-      "description": "Тип паттерна ПД: fio (Фамилия Имя Отчество), fio_short (Фамилия И.О.), name (Фамилия Имя), email, phone"
+      "enum": ["fio", "fio_short", "name", "email", "phone", "firstname", "lastname", "patronymic"],
+      "description": "Тип паттерна ПД: fio (Фамилия Имя Отчество), fio_short (Фамилия И.О.), name (Фамилия Имя), email, phone, firstname (имя), lastname (фамилия), patronymic (отчество)"
     },
     "faker": {
       "description": "Замена персональных данных. Ключ — имя схемы.",

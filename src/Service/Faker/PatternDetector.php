@@ -20,6 +20,12 @@ class PatternDetector
     public const PATTERN_EMAIL = 'email';
     /** @var string Телефонный номер */
     public const PATTERN_PHONE = 'phone';
+    /** @var string Имя (одиночное, определяется кросс-корреляцией) */
+    public const PATTERN_FIRSTNAME = 'firstname';
+    /** @var string Фамилия (одиночная, определяется кросс-корреляцией) */
+    public const PATTERN_LASTNAME = 'lastname';
+    /** @var string Отчество (одиночное, определяется кросс-корреляцией) */
+    public const PATTERN_PATRONYMIC = 'patronymic';
 
     /** @var int Размер выборки для анализа */
     public const SAMPLE_SIZE = 200;
@@ -36,6 +42,19 @@ class PatternDetector
     private const REGEX_FIO_SHORT = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁ]\\.\\s?[А-ЯЁ]\\.$/u';
     /** @var string 2 кириллических слова (с поддержкой дефиса) */
     private const REGEX_NAME = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?\\s+[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?$/u';
+    /** @var string Одно кириллическое слово (с поддержкой дефиса) */
+    private const REGEX_SINGLE_CYRILLIC_WORD = '/^[А-ЯЁа-яё]+(?:\\-[А-ЯЁа-яё]+)?$/u';
+    /** @var string Суффиксы отчеств */
+    private const REGEX_PATRONYMIC_SUFFIX = '/(ович|евич|ьич|овна|евна|ична|инична)$/u';
+    /** @var string Суффиксы фамилий (без -ин/-ина из-за совпадений с женскими именами) */
+    private const REGEX_LASTNAME_SUFFIX = '/(ов|ова|ев|ева|ёв|ёва|ский|ская|цкий|цкая|ых|их)$/u';
+
+    /** @var array<string> Подсказки по имени колонки: имя */
+    private const COLUMN_HINTS_FIRSTNAME = ['/first_?name/i', '/fname/i', '/given/i', '/имя/ui'];
+    /** @var array<string> Подсказки по имени колонки: фамилия */
+    private const COLUMN_HINTS_LASTNAME = ['/last_?name/i', '/lname/i', '/surname/i', '/family/i', '/фамилия/ui'];
+    /** @var array<string> Подсказки по имени колонки: отчество */
+    private const COLUMN_HINTS_PATRONYMIC = ['/patronym/i', '/middle_?name/i', '/отчество/ui'];
 
     /** @var ConnectionRegistryInterface */
     private $registry;
@@ -86,6 +105,8 @@ class PatternDetector
             }
         }
 
+        $detected = $this->detectLinkedColumns($rows, $detected);
+
         return $detected;
     }
 
@@ -130,5 +151,140 @@ class PatternDetector
         }
 
         return null;
+    }
+
+    /**
+     * Обнаруживает колонки-компоненты ФИО по кросс-корреляции с составными колонками.
+     *
+     * @param array<array<string, mixed>> $rows
+     * @param array<string, string> $detected
+     * @return array<string, string>
+     */
+    private function detectLinkedColumns(array $rows, array $detected): array
+    {
+        // Составные колонки (name или fio)
+        $compositeColumns = [];
+        foreach ($detected as $column => $pattern) {
+            if ($pattern === self::PATTERN_NAME || $pattern === self::PATTERN_FIO) {
+                $compositeColumns[] = $column;
+            }
+        }
+
+        if (empty($compositeColumns) || empty($rows)) {
+            return $detected;
+        }
+
+        $columns = array_keys($rows[0]);
+
+        foreach ($columns as $column) {
+            if (isset($detected[$column])) {
+                continue;
+            }
+
+            // Собрать непустые значения
+            $values = [];
+            foreach ($rows as $row) {
+                if ($row[$column] !== null && $row[$column] !== '') {
+                    $values[] = (string) $row[$column];
+                }
+            }
+
+            if (count($values) < 10) {
+                continue;
+            }
+
+            // Проверить: >80% значений — одиночные кириллические слова
+            $singleWordCount = 0;
+            foreach ($values as $value) {
+                if (preg_match(self::REGEX_SINGLE_CYRILLIC_WORD, trim($value))) {
+                    $singleWordCount++;
+                }
+            }
+
+            if (($singleWordCount / count($values)) < self::DETECTION_THRESHOLD) {
+                continue;
+            }
+
+            // Кросс-корреляция с составными колонками
+            foreach ($compositeColumns as $compositeColumn) {
+                $matchCount = 0;
+                $comparedCount = 0;
+
+                foreach ($rows as $row) {
+                    if ($row[$column] === null || $row[$column] === ''
+                        || $row[$compositeColumn] === null || $row[$compositeColumn] === ''
+                    ) {
+                        continue;
+                    }
+
+                    $comparedCount++;
+                    $value = trim((string) $row[$column]);
+                    $compositeValue = (string) $row[$compositeColumn];
+
+                    /** @var array<string> $words */
+                    $words = preg_split('/\\s+/', $compositeValue);
+                    if (in_array($value, $words, true)) {
+                        $matchCount++;
+                    }
+                }
+
+                if ($comparedCount >= 10 && ($matchCount / $comparedCount) >= self::DETECTION_THRESHOLD) {
+                    $detected[$column] = $this->classifyNameRole($column, $values);
+                    break;
+                }
+            }
+        }
+
+        return $detected;
+    }
+
+    /**
+     * Определяет роль колонки-компонента (firstname/lastname/patronymic).
+     *
+     * @param string $column имя колонки
+     * @param array<string> $values непустые значения колонки
+     */
+    private function classifyNameRole(string $column, array $values): string
+    {
+        // Приоритет 1: эвристика по имени колонки
+        foreach (self::COLUMN_HINTS_FIRSTNAME as $regex) {
+            if (preg_match($regex, $column)) {
+                return self::PATTERN_FIRSTNAME;
+            }
+        }
+        foreach (self::COLUMN_HINTS_LASTNAME as $regex) {
+            if (preg_match($regex, $column)) {
+                return self::PATTERN_LASTNAME;
+            }
+        }
+        foreach (self::COLUMN_HINTS_PATRONYMIC as $regex) {
+            if (preg_match($regex, $column)) {
+                return self::PATTERN_PATRONYMIC;
+            }
+        }
+
+        // Приоритет 2: суффиксный анализ (порог >50%)
+        $patronymicCount = 0;
+        $lastnameCount = 0;
+        $total = count($values);
+
+        foreach ($values as $value) {
+            $trimmed = trim($value);
+            if (preg_match(self::REGEX_PATRONYMIC_SUFFIX, $trimmed)) {
+                $patronymicCount++;
+            } elseif (preg_match(self::REGEX_LASTNAME_SUFFIX, $trimmed)) {
+                $lastnameCount++;
+            }
+        }
+
+        if ($total > 0 && ($patronymicCount / $total) > 0.50) {
+            return self::PATTERN_PATRONYMIC;
+        }
+        if ($total > 0 && ($lastnameCount / $total) > 0.50) {
+            return self::PATTERN_LASTNAME;
+        }
+
+        // Приоритет 3: fallback
+        return self::PATTERN_FIRSTNAME;
     }
 }
