@@ -84,7 +84,7 @@ PHP-пакет для экспорта и импорта дампов баз д�
 - **Автогенерация конфига** — команда `prepare-config` создаёт YAML по структуре БД
 - **FK-сортировка** — автоматическая топологическая сортировка таблиц при экспорте и импорте (родители первыми)
 - **Каскадные зависимости** — `cascade_from` генерирует WHERE-подзапросы для связности данных через FK
-- **Замена ПД (faker)** — автоматическое обнаружение и замена персональных данных (ФИО, email, телефон) при экспорте
+- **Замена ПД (faker)** — автоматическое обнаружение и замена персональных данных (ФИО, email, телефон, пол) при экспорте
 - **Разделение конфига** — автоматическое разбиение конфигурации на отдельные файлы по схемам
 
 ## Установка
@@ -234,8 +234,12 @@ partial_export:
 | `fio` | ФИО полностью | Иванов Иван Иванович | Петров Александр Сергеевич |
 | `fio_short` | ФИО сокращённо | Иванов И.И. | Козлов А.В. |
 | `name` | Фамилия Имя | Иванов Иван | Петров Александр |
+| `firstname` | Имя (кросс-корреляция с составной колонкой) | Иван | Александр |
+| `lastname` | Фамилия (кросс-корреляция с составной колонкой) | Иванов | Петров |
+| `patronymic` | Отчество (кросс-корреляция с составной колонкой) | Иванович | Сергеевич |
 | `email` | Email | ivan@company.ru | aleksandr.petrov42@example.com |
-| `phone` | Телефон | +79161234567 | 79234567890 |
+| `phone` | Телефон | +79161234567 | +79234567890 |
+| `gender` | Пол (12 форматов: male/female, м/ж, муж/жен и др.) | Мужской | Женский |
 
 **Секция `faker` в конфигурации:**
 
@@ -245,13 +249,21 @@ faker:
     users:
       full_name: fio
       display_name: name
+      first_name: firstname
+      last_name: lastname
+      middle_name: patronymic
       email: email
       phone: phone
+      sex: gender
     employees:
       fio: fio
       short_fio: fio_short
       contact_email: email
 ```
+
+Паттерны `firstname`, `lastname` и `patronymic` детектируются через кросс-корреляцию: если в таблице уже найдена составная колонка (fio, fio_short, name), а рядом есть колонка с отдельными именами/фамилиями/отчествами — она будет обнаружена автоматически.
+
+Паттерн `gender` определяется по совпадению имени колонки (`gender`, `sex`, `пол`) **и** содержимого (допустимые значения: `male`/`female`, `m`/`f`, `м`/`ж`, `мужской`/`женский`, `муж`/`жен`, `мужчина`/`женщина`). Регистр и формат оригинала сохраняются при замене.
 
 Команда `prepare-config` автоматически анализирует содержимое таблиц и генерирует секцию `faker`, если в колонках обнаруживаются паттерны ПД (порог совпадения: 80% из 200 случайных строк). Чтобы отключить: `--no-faker`.
 
@@ -595,7 +607,7 @@ php artisan dbdump:import --skip-before --skip-after
 3. **TableDependencyResolver** — топологическая сортировка таблиц по FK (родители экспортируются первыми)
 4. **DataFetcher** — получает данные из БД через `ConnectionRegistry`
 5. **CascadeWhereResolver** — генерирует WHERE-подзапросы из `cascade_from` для связности данных
-6. **RussianFaker** — заменяет персональные данные (ФИО, email, телефон) на сгенерированные
+6. **RussianFaker** — заменяет персональные данные (ФИО, email, телефон, пол) на сгенерированные
 7. **SqlGenerator** — генерирует SQL: TRUNCATE + INSERT + сброс счётчиков
 8. Результат сохраняется в `database/dumps/{schema}/{table}.sql`
 
@@ -822,7 +834,7 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 - **Auto-generate config** — `prepare-config` command creates YAML from DB structure
 - **FK-aware ordering** — automatic topological sorting of tables during export and import (parents first)
 - **Cascade dependencies** — `cascade_from` generates WHERE subqueries to keep data consistent across FK relations
-- **Personal data masking (faker)** — automatic detection and replacement of PII (Russian names, email, phone) during export
+- **Personal data masking (faker)** — automatic detection and replacement of PII (Russian names, email, phone, gender) during export
 - **Config splitting** — automatic splitting of configuration into per-schema files
 
 ## Installation
@@ -974,8 +986,12 @@ The package can automatically detect and replace personal data during export. Th
 | `fio` | Full Russian name | Иванов Иван Иванович | Петров Александр Сергеевич |
 | `fio_short` | Short Russian name | Иванов И.И. | Козлов А.В. |
 | `name` | First and last name | Иванов Иван | Петров Александр |
+| `firstname` | First name (cross-correlated with composite column) | Иван | Александр |
+| `lastname` | Last name (cross-correlated with composite column) | Иванов | Петров |
+| `patronymic` | Patronymic (cross-correlated with composite column) | Иванович | Сергеевич |
 | `email` | Email address | ivan@company.ru | aleksandr.petrov42@example.com |
-| `phone` | Phone number | +79161234567 | 79234567890 |
+| `phone` | Phone number | +79161234567 | +79234567890 |
+| `gender` | Gender (12 formats: male/female, m/f, м/ж, etc.) | Мужской | Женский |
 
 **The `faker` section in configuration:**
 
@@ -985,13 +1001,21 @@ faker:
     users:
       full_name: fio
       display_name: name
+      first_name: firstname
+      last_name: lastname
+      middle_name: patronymic
       email: email
       phone: phone
+      sex: gender
     employees:
       fio: fio
       short_fio: fio_short
       contact_email: email
 ```
+
+The `firstname`, `lastname`, and `patronymic` patterns are detected via cross-correlation: if a composite column (fio, fio_short, name) is already found in the table and there's an adjacent column with individual first names/last names/patronymics — it will be detected automatically.
+
+The `gender` pattern is detected by matching both the column name (`gender`, `sex`, `пол`) **and** its contents (valid values: `male`/`female`, `m`/`f`, `м`/`ж`, `мужской`/`женский`, `муж`/`жен`, `мужчина`/`женщина`). The original value's case and format are preserved during replacement.
 
 The `prepare-config` command automatically analyzes table contents and generates the `faker` section when PII patterns are detected in columns (threshold: 80% match from 200 random rows). To disable: `--no-faker`.
 
@@ -1335,7 +1359,7 @@ Command → TableConfigResolver → DatabaseDumper → [FK sorting] → DataFetc
 3. **TableDependencyResolver** — topological sorting of tables by FK (parents are exported first)
 4. **DataFetcher** — fetches data from the DB via `ConnectionRegistry`
 5. **CascadeWhereResolver** — generates WHERE subqueries from `cascade_from` for data consistency
-6. **RussianFaker** — replaces personal data (names, email, phone) with generated values
+6. **RussianFaker** — replaces personal data (names, email, phone, gender) with generated values
 7. **SqlGenerator** — generates SQL: TRUNCATE + INSERT + counter reset
 8. Result is saved to `database/dumps/{schema}/{table}.sql`
 
