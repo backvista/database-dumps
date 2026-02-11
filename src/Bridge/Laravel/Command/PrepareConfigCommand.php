@@ -10,7 +10,7 @@ use Illuminate\Console\Command;
 class PrepareConfigCommand extends Command
 {
     /** @var string */
-    protected $signature = 'dbdump:prepare-config {mode : Режим: all, schema=<name>, table=<schema.table>, new} {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения} {--no-cascade : Пропустить обнаружение FK и генерацию cascade_from} {--no-faker : Пропустить обнаружение персональных данных} {--no-split : Генерировать единый YAML без разделения по схемам}';
+    protected $signature = 'dbdump:prepare-config {mode? : Режим: all, schema=<name>, table=<schema.table>, new} {--threshold=500 : Порог строк для partial_export} {--force : Перезаписать без подтверждения} {--no-cascade : Пропустить обнаружение FK и генерацию cascade_from} {--no-faker : Пропустить обнаружение персональных данных} {--no-split : Генерировать единый YAML без разделения по схемам}';
 
     /** @var string */
     protected $description = 'Автоматическая генерация dump_config.yaml на основе структуры БД';
@@ -58,12 +58,20 @@ HELP;
 
         $this->info('Генерация dump_config.yaml');
 
-        /** @var string $modeArg */
+        /** @var string|null $modeArg */
         $modeArg = $this->argument('mode');
+
+        if ($modeArg === null || $modeArg === '') {
+            $this->error('Не указан режим работы.');
+            $this->printModeUsage();
+            return self::FAILURE;
+        }
+
         $parsed = $this->parseMode($modeArg);
 
         if ($parsed === null) {
-            $this->error("Неизвестный режим: {$modeArg}. Допустимые: all, schema=<name>, table=<schema.table>, new");
+            $this->error("Неизвестный режим: {$modeArg}");
+            $this->printModeUsage();
             return self::FAILURE;
         }
 
@@ -157,6 +165,22 @@ HELP;
         }
 
         return null;
+    }
+
+    private function printModeUsage(): void
+    {
+        $this->line('');
+        $this->line('Доступные режимы:');
+        $this->line('  <info>all</info>              Полная регенерация конфигурации');
+        $this->line('  <info>schema=</info><comment>name</comment>     Перегенерация одной схемы, мёрж в существующий конфиг');
+        $this->line('  <info>table=</info><comment>schema.table</comment>  Перегенерация одной таблицы, мёрж в существующий конфиг');
+        $this->line('  <info>new</info>              Обнаружение и дописывание новых таблиц');
+        $this->line('');
+        $this->line('Примеры:');
+        $this->line('  php artisan dbdump:prepare-config <info>all</info>');
+        $this->line('  php artisan dbdump:prepare-config <info>schema=billing</info>');
+        $this->line('  php artisan dbdump:prepare-config <info>table=public.users</info>');
+        $this->line('  php artisan dbdump:prepare-config <info>new</info>');
     }
 
     private function setupLogger(): void

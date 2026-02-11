@@ -30,7 +30,7 @@ class PrepareConfigCommand extends Command
         $this
             ->setName('app:dbdump:prepare-config')
             ->setDescription('Автоматическая генерация dump_config.yaml на основе структуры БД')
-            ->addArgument('mode', InputArgument::REQUIRED, 'Режим: all, schema=<name>, table=<schema.table>, new')
+            ->addArgument('mode', InputArgument::OPTIONAL, 'Режим: all, schema=<name>, table=<schema.table>, new')
             ->addOption('threshold', 't', InputOption::VALUE_REQUIRED, 'Порог строк для partial_export', '500')
             ->addOption('force', 'f', InputOption::VALUE_NONE, 'Перезаписать без подтверждения')
             ->addOption('no-cascade', null, InputOption::VALUE_NONE, 'Пропустить обнаружение FK и генерацию cascade_from')
@@ -62,12 +62,20 @@ HELP
         $io = new SymfonyStyle($input, $output);
         $io->title('Генерация dump_config.yaml');
 
-        /** @var string $modeArg */
+        /** @var string|null $modeArg */
         $modeArg = $input->getArgument('mode');
+
+        if ($modeArg === null || $modeArg === '') {
+            $io->error('Не указан режим работы.');
+            $this->printModeUsage($io);
+            return Command::FAILURE;
+        }
+
         $parsed = $this->parseMode($modeArg);
 
         if ($parsed === null) {
-            $io->error("Неизвестный режим: {$modeArg}. Допустимые: all, schema=<name>, table=<schema.table>, new");
+            $io->error("Неизвестный режим: {$modeArg}");
+            $this->printModeUsage($io);
             return Command::FAILURE;
         }
 
@@ -163,5 +171,22 @@ HELP
         }
 
         return null;
+    }
+
+    private function printModeUsage(SymfonyStyle $io): void
+    {
+        $io->text([
+            'Доступные режимы:',
+            '  <info>all</info>              Полная регенерация конфигурации',
+            '  <info>schema=</info><comment>name</comment>     Перегенерация одной схемы, мёрж в существующий конфиг',
+            '  <info>table=</info><comment>schema.table</comment>  Перегенерация одной таблицы, мёрж в существующий конфиг',
+            '  <info>new</info>              Обнаружение и дописывание новых таблиц',
+            '',
+            'Примеры:',
+            '  php bin/console app:dbdump:prepare-config <info>all</info>',
+            '  php bin/console app:dbdump:prepare-config <info>schema=billing</info>',
+            '  php bin/console app:dbdump:prepare-config <info>table=public.users</info>',
+            '  php bin/console app:dbdump:prepare-config <info>new</info>',
+        ]);
     }
 }
