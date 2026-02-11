@@ -13,6 +13,8 @@ class PlatformFactory
     public const PGSQL = 'pgsql';
     public const MYSQL = 'mysql';
     public const MARIADB = 'mariadb';
+    public const ORACLE = 'oracle';
+    public const OCI = 'oci';
 
     /**
      * @param string $platformName Имя платформы (postgresql, pgsql, mysql, mariadb)
@@ -30,6 +32,9 @@ class PlatformFactory
             case self::MYSQL:
             case self::MARIADB:
                 return new MySqlPlatform();
+            case self::ORACLE:
+            case self::OCI:
+                return new OraclePlatform();
             default:
                 throw new \InvalidArgumentException("Неподдерживаемая платформа БД: {$platformName}");
         }

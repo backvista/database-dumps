@@ -78,6 +78,10 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
             return PlatformFactory::MYSQL;
         }
 
+        if (strpos($className, 'Oracle') !== false || strpos($className, 'OCI') !== false) {
+            return PlatformFactory::ORACLE;
+        }
+
         return PlatformFactory::POSTGRESQL;
     }
 }

@@ -41,8 +41,9 @@ class TableInspector
         $sql = "SELECT COUNT(*) AS cnt FROM {$fullTable}";
 
         $rows = $connection->fetchAllAssociative($sql);
+        $row = array_change_key_case($rows[0], CASE_LOWER);
 
-        return (int) $rows[0]['cnt'];
+        return (int) $row['cnt'];
     }
 
     /**
@@ -53,11 +54,19 @@ class TableInspector
     public function detectOrderColumn(string $schema, string $table, ?string $connectionName = null): string
     {
         $connection = $this->registry->getConnection($connectionName);
+        $platformName = $connection->getPlatformName();
 
-        $sql = "SELECT column_name FROM information_schema.columns "
-            . "WHERE table_schema = " . $connection->quote($schema)
-            . " AND table_name = " . $connection->quote($table)
-            . " ORDER BY ordinal_position";
+        if ($platformName === PlatformFactory::ORACLE || $platformName === PlatformFactory::OCI) {
+            $sql = "SELECT LOWER(column_name) AS column_name FROM all_tab_columns "
+                . "WHERE owner = " . $connection->quote(strtoupper($schema))
+                . " AND table_name = " . $connection->quote(strtoupper($table))
+                . " ORDER BY column_id";
+        } else {
+            $sql = "SELECT column_name FROM information_schema.columns "
+                . "WHERE table_schema = " . $connection->quote($schema)
+                . " AND table_name = " . $connection->quote($table)
+                . " ORDER BY ordinal_position";
+        }
 
         $rows = $connection->fetchAllAssociative($sql);
 
@@ -93,6 +102,10 @@ class TableInspector
                 . "WHERE table_schema NOT IN ('pg_catalog', 'information_schema') "
                 . "AND table_type = 'BASE TABLE' "
                 . "ORDER BY table_schema, table_name";
+        } elseif ($platform === PlatformFactory::ORACLE || $platform === PlatformFactory::OCI) {
+            $sql = "SELECT LOWER(owner) AS table_schema, LOWER(table_name) AS table_name FROM all_tables "
+                . "WHERE owner NOT IN ('SYS','SYSTEM','OUTLN','DBSNMP','APPQOSSYS','WMSYS','CTXSYS','XDB','ORDDATA','ORDSYS','MDSYS','OLAPSYS') "
+                . "ORDER BY owner, table_name";
         } else {
             $sql = "SELECT table_schema, table_name FROM information_schema.tables "
                 . "WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys') "
@@ -110,6 +123,10 @@ class TableInspector
 
         if ($platform === PlatformFactory::POSTGRESQL || $platform === PlatformFactory::PGSQL) {
             return '"' . $schema . '"."' . $table . '"';
+        }
+
+        if ($platform === PlatformFactory::ORACLE || $platform === PlatformFactory::OCI) {
+            return '"' . strtoupper($schema) . '"."' . strtoupper($table) . '"';
         }
 
         return '`' . $schema . '`.`' . $table . '`';

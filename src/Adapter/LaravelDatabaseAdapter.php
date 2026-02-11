@@ -92,6 +92,9 @@ class LaravelDatabaseAdapter implements DatabaseConnectionInterface
             case PlatformFactory::MYSQL:
             case PlatformFactory::MARIADB:
                 return PlatformFactory::MYSQL;
+            case PlatformFactory::OCI:
+            case PlatformFactory::ORACLE:
+                return PlatformFactory::ORACLE;
             default:
                 return $driver;
         }

@@ -158,4 +158,41 @@ class ForeignKeyInspectorTest extends TestCase
 
         $this->assertEquals([], $result);
     }
+
+    public function testGetForeignKeysOracle(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $fkRows = [
+            [
+                'constraint_name' => 'fk_orders_user_id',
+                'source_schema' => 'hr',
+                'source_table' => 'orders',
+                'source_column' => 'user_id',
+                'target_schema' => 'hr',
+                'target_table' => 'users',
+                'target_column' => 'id',
+            ],
+        ];
+
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('all_constraints'),
+                $this->stringContains('all_cons_columns'),
+                $this->stringContains("'SYS'"),
+                $this->stringContains("'SYSTEM'"),
+                $this->stringContains("constraint_type = 'R'")
+            ))
+            ->willReturn($fkRows);
+
+        $inspector = new ForeignKeyInspector($this->registry);
+        $result = $inspector->getForeignKeys();
+
+        $this->assertCount(1, $result);
+        $this->assertEquals('fk_orders_user_id', $result[0]['constraint_name']);
+        $this->assertEquals('orders', $result[0]['source_table']);
+        $this->assertEquals('users', $result[0]['target_table']);
+    }
 }

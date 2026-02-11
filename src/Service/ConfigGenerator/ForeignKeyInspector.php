@@ -42,6 +42,22 @@ JOIN information_schema.constraint_column_usage ccu
 WHERE tc.constraint_type = 'FOREIGN KEY'
     AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')
 ORDER BY tc.table_schema, tc.table_name, tc.constraint_name";
+        } elseif ($platform === PlatformFactory::ORACLE || $platform === PlatformFactory::OCI) {
+            $sql = "SELECT
+    LOWER(c.constraint_name) AS constraint_name,
+    LOWER(c.owner) AS source_schema,
+    LOWER(c.table_name) AS source_table,
+    LOWER(cc.column_name) AS source_column,
+    LOWER(r.owner) AS target_schema,
+    LOWER(r.table_name) AS target_table,
+    LOWER(rc.column_name) AS target_column
+FROM all_constraints c
+JOIN all_cons_columns cc ON c.constraint_name = cc.constraint_name AND c.owner = cc.owner
+JOIN all_constraints r ON c.r_constraint_name = r.constraint_name AND c.r_owner = r.owner
+JOIN all_cons_columns rc ON r.constraint_name = rc.constraint_name AND r.owner = rc.owner AND cc.position = rc.position
+WHERE c.constraint_type = 'R'
+    AND c.owner NOT IN ('SYS','SYSTEM','OUTLN','DBSNMP','APPQOSSYS','WMSYS','CTXSYS','XDB','ORDDATA','ORDSYS','MDSYS','OLAPSYS')
+ORDER BY c.owner, c.table_name, c.constraint_name";
         } else {
             $sql = "SELECT
     tc.CONSTRAINT_NAME AS constraint_name,

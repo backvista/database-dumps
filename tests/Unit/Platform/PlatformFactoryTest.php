@@ -4,6 +4,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Platform;
 
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Platform\MySqlPlatform;
+use BackVista\DatabaseDumps\Platform\OraclePlatform;
 use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 
@@ -37,10 +38,25 @@ class PlatformFactoryTest extends TestCase
         $this->assertInstanceOf(MySqlPlatform::class, $platform);
     }
 
+    public function testCreateOracle(): void
+    {
+        $platform = PlatformFactory::create(PlatformFactory::ORACLE);
+
+        $this->assertInstanceOf(OraclePlatform::class, $platform);
+    }
+
+    public function testCreateOci(): void
+    {
+        $platform = PlatformFactory::create(PlatformFactory::OCI);
+
+        $this->assertInstanceOf(OraclePlatform::class, $platform);
+    }
+
     public function testCreateIsCaseInsensitive(): void
     {
         $this->assertInstanceOf(PostgresPlatform::class, PlatformFactory::create('PostgreSQL'));
         $this->assertInstanceOf(MySqlPlatform::class, PlatformFactory::create('MySQL'));
+        $this->assertInstanceOf(OraclePlatform::class, PlatformFactory::create('Oracle'));
     }
 
     public function testCreateThrowsForUnsupportedPlatform(): void

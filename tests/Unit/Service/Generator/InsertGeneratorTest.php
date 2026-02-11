@@ -5,6 +5,8 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Generator;
 use PHPUnit\Framework\TestCase;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\OraclePlatform;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Generator\InsertGenerator;
 
@@ -106,5 +108,65 @@ class InsertGeneratorTest extends TestCase
         $this->assertStringContainsString('"test_schema"."test_table"', $sql);
         $this->assertStringContainsString('"id"', $sql);
         $this->assertStringContainsString('"name"', $sql);
+    }
+
+    public function testGenerateOracleSingleRowInserts(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $platform = new OraclePlatform();
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $generator = new InsertGenerator($registry);
+
+        $rows = [
+            ['id' => 1, 'name' => 'User 1'],
+            ['id' => 2, 'name' => 'User 2'],
+            ['id' => 3, 'name' => 'User 3'],
+        ];
+
+        $sql = $generator->generate('users', 'users', $rows);
+
+        // Каждая строка — отдельный INSERT
+        $this->assertEquals(3, substr_count($sql, 'INSERT INTO'));
+        $this->assertStringContainsString('"USERS"."USERS"', $sql);
+        $this->assertStringContainsString('"ID", "NAME"', $sql);
+        $this->assertStringNotContainsString('Batch', $sql);
+
+        // Нет multi-row VALUES (запятой между строками)
+        $this->assertStringNotContainsString("),\n(", $sql);
+    }
+
+    public function testGenerateOracleHandlesNullValues(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $platform = new OraclePlatform();
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $generator = new InsertGenerator($registry);
+
+        $rows = [
+            ['id' => 1, 'name' => 'User 1', 'email' => null],
+        ];
+
+        $sql = $generator->generate('users', 'users', $rows);
+
+        $this->assertStringContainsString('NULL', $sql);
+        $this->assertEquals(1, substr_count($sql, 'INSERT INTO'));
     }
 }

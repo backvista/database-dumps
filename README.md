@@ -12,7 +12,7 @@
 
 # Русский
 
-PHP-пакет для экспорта и импорта дампов баз данных в SQL. Поддерживает PostgreSQL и MySQL. Работает с Symfony, Laravel и любым PHP-проектом.
+PHP-пакет для экспорта и импорта дампов баз данных в SQL. Поддерживает PostgreSQL, MySQL и Oracle (12c+). Работает с Symfony, Laravel и любым PHP-проектом.
 
 ## Оглавление
 
@@ -73,7 +73,7 @@ PHP-пакет для экспорта и импорта дампов баз д�
 ## Возможности
 
 - **Не привязан к фреймворку** — работает с Symfony, Laravel и любым PHP-проектом
-- **PostgreSQL и MySQL** — автоматически генерирует правильный SQL для каждой СУБД
+- **PostgreSQL, MySQL и Oracle** — автоматически генерирует правильный SQL для каждой СУБД
 - **Несколько подключений** — экспорт/импорт сразу из нескольких баз данных
 - **Пакетные INSERT** — автоматическая группировка по 1000 строк на выражение
 - **Откат при ошибках** — импорт выполняется в транзакции
@@ -420,7 +420,7 @@ return [
 
 ```yaml
 parameters:
-    database_dumps.platform: 'postgresql'  # или 'mysql'
+    database_dumps.platform: 'postgresql'  # или 'mysql', 'oracle'
 ```
 
 <a id="структура-каталогов-symfony"></a>
@@ -629,13 +629,18 @@ php artisan dbdump:import --skip-before --skip-after
 
 Пакет сам генерирует правильный SQL в зависимости от СУБД:
 
-| | PostgreSQL | MySQL |
-|---|---|---|
-| Имена таблиц | `"table"` (двойные кавычки) | `` `table` `` (обратные кавычки) |
-| TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` |
-| Счётчики | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
+| | PostgreSQL | MySQL | Oracle (12c+) |
+|---|---|---|---|
+| Имена таблиц | `"table"` (двойные кавычки) | `` `table` `` (обратные кавычки) | `"TABLE"` (двойные кавычки, UPPERCASE) |
+| TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` | `DELETE FROM` (FK-safe) |
+| Счётчики | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` | Комментарий-заглушка (используйте `after_exec/`) |
+| LIMIT | `LIMIT N` | `LIMIT N` | `FETCH FIRST N ROWS ONLY` |
+| INSERT | Батч 1000 строк | Батч 1000 строк | По одной строке (нет multi-row INSERT) |
+| Случайное число | `RANDOM()` | `RAND()` | `DBMS_RANDOM.VALUE` |
 
 Платформа определяется автоматически по подключению к БД.
+
+> **Oracle:** используется `DELETE FROM` вместо `TRUNCATE TABLE`, т.к. Oracle TRUNCATE не поддерживает CASCADE и блокируется FK constraints. Сброс sequences требует PL/SQL — используйте скрипты в `database/after_exec/`.
 
 <a id="структура-исходного-кода"></a>
 
@@ -645,7 +650,8 @@ php artisan dbdump:import --skip-before --skip-after
 src/
 ├── Adapter/                          # Адаптеры подключений к БД
 │   ├── DoctrineDbalAdapter.php       #   Doctrine DBAL
-│   └── LaravelDatabaseAdapter.php    #   Laravel DB
+│   ├── LaravelDatabaseAdapter.php    #   Laravel DB
+│   └── PdoAdapter.php               #   Универсальный PDO (Oracle и др.)
 ├── Bridge/                           # Интеграции с фреймворками
 │   ├── Laravel/
 │   │   ├── Command/                  #   Artisan-команды
@@ -666,6 +672,7 @@ src/
 ├── Exception/                        # Исключения
 ├── Platform/                         # Поддержка SQL-диалектов
 │   ├── MySqlPlatform.php
+│   ├── OraclePlatform.php
 │   ├── PostgresPlatform.php
 │   └── PlatformFactory.php
 ├── Service/
@@ -762,7 +769,7 @@ MIT License. Подробнее в файле [LICENSE](LICENSE).
 
 # English
 
-PHP package for exporting and importing database dumps as SQL. Supports PostgreSQL and MySQL. Works with Symfony, Laravel, and any PHP project.
+PHP package for exporting and importing database dumps as SQL. Supports PostgreSQL, MySQL, and Oracle (12c+). Works with Symfony, Laravel, and any PHP project.
 
 ## Table of Contents
 
@@ -823,7 +830,7 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 ## Features
 
 - **No framework lock-in** — works with Symfony, Laravel, and any PHP project
-- **PostgreSQL & MySQL** — automatically generates the right SQL for each database
+- **PostgreSQL, MySQL & Oracle** — automatically generates the right SQL for each database
 - **Multiple connections** — export/import from several databases at once
 - **Batched INSERTs** — automatically groups rows (1000 per statement)
 - **Rollback on errors** — import runs inside a transaction
@@ -1172,7 +1179,7 @@ Set the platform in `services.yaml`:
 
 ```yaml
 parameters:
-    database_dumps.platform: 'postgresql'  # or 'mysql'
+    database_dumps.platform: 'postgresql'  # or 'mysql', 'oracle'
 ```
 
 <a id="directory-structure-symfony"></a>
@@ -1381,13 +1388,18 @@ Command → DatabaseImporter → ProductionGuard → TransactionManager → [FK 
 
 The package generates the right SQL depending on the database:
 
-| | PostgreSQL | MySQL |
-|---|---|---|
-| Table names | `"table"` (double quotes) | `` `table` `` (backticks) |
-| TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` |
-| Counters | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` |
+| | PostgreSQL | MySQL | Oracle (12c+) |
+|---|---|---|---|
+| Table names | `"table"` (double quotes) | `` `table` `` (backticks) | `"TABLE"` (double quotes, UPPERCASE) |
+| TRUNCATE | `TRUNCATE ... CASCADE` | `SET FOREIGN_KEY_CHECKS=0` | `DELETE FROM` (FK-safe) |
+| Counters | `setval()` / `pg_get_serial_sequence()` | `ALTER TABLE ... AUTO_INCREMENT` | Stub comment (use `after_exec/`) |
+| LIMIT | `LIMIT N` | `LIMIT N` | `FETCH FIRST N ROWS ONLY` |
+| INSERT | Batch 1000 rows | Batch 1000 rows | One row per INSERT (no multi-row INSERT) |
+| Random function | `RANDOM()` | `RAND()` | `DBMS_RANDOM.VALUE` |
 
 The platform is detected automatically from the DB connection.
+
+> **Oracle:** `DELETE FROM` is used instead of `TRUNCATE TABLE` because Oracle TRUNCATE doesn't support CASCADE and is blocked by FK constraints. Sequence reset requires PL/SQL — use scripts in `database/after_exec/`.
 
 <a id="source-directory-structure"></a>
 
@@ -1397,7 +1409,8 @@ The platform is detected automatically from the DB connection.
 src/
 ├── Adapter/                          # DB connection adapters
 │   ├── DoctrineDbalAdapter.php       #   Doctrine DBAL
-│   └── LaravelDatabaseAdapter.php    #   Laravel DB
+│   ├── LaravelDatabaseAdapter.php    #   Laravel DB
+│   └── PdoAdapter.php               #   Universal PDO (Oracle, etc.)
 ├── Bridge/                           # Framework integrations
 │   ├── Laravel/
 │   │   ├── Command/                  #   Artisan commands
@@ -1418,6 +1431,7 @@ src/
 ├── Exception/                        # Exceptions
 ├── Platform/                         # SQL dialect support
 │   ├── MySqlPlatform.php
+│   ├── OraclePlatform.php
 │   ├── PostgresPlatform.php
 │   └── PlatformFactory.php
 ├── Service/

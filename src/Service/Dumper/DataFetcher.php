@@ -5,6 +5,7 @@ namespace BackVista\DatabaseDumps\Service\Dumper;
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 
 /**
  * Загрузка данных из таблицы
@@ -65,7 +66,12 @@ class DataFetcher
         }
 
         if ($config->getLimit()) {
-            $sql .= " LIMIT {$config->getLimit()}";
+            $platformName = $connection->getPlatformName();
+            if ($platformName === PlatformFactory::ORACLE || $platformName === PlatformFactory::OCI) {
+                $sql .= " FETCH FIRST {$config->getLimit()} ROWS ONLY";
+            } else {
+                $sql .= " LIMIT {$config->getLimit()}";
+            }
         }
 
         return $connection->fetchAllAssociative($sql);

@@ -205,4 +205,69 @@ class TableInspectorTest extends TestCase
 
         $this->assertEquals('update_at DESC', $orderColumn);
     }
+
+    public function testListTablesOracle(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('all_tables'),
+                $this->stringContains("'SYS'"),
+                $this->stringContains("'SYSTEM'")
+            ))
+            ->willReturn([
+                ['table_schema' => 'hr', 'table_name' => 'employees'],
+                ['table_schema' => 'hr', 'table_name' => 'departments'],
+            ]);
+
+        $inspector = new TableInspector($this->registry);
+        $tables = $inspector->listTables();
+
+        $this->assertCount(2, $tables);
+        $this->assertEquals('employees', $tables[0]['table_name']);
+        $this->assertEquals('hr', $tables[0]['table_schema']);
+    }
+
+    public function testCountRowsOracle(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->stringContains('"HR"."EMPLOYEES"'))
+            ->willReturn([['CNT' => 50]]);
+
+        $inspector = new TableInspector($this->registry);
+        $count = $inspector->countRows('hr', 'employees');
+
+        $this->assertEquals(50, $count);
+    }
+
+    public function testDetectOrderColumnOracle(): void
+    {
+        $this->connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+        $this->connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $this->connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('all_tab_columns'),
+                $this->stringContains("'HR'"),
+                $this->stringContains("'EMPLOYEES'")
+            ))
+            ->willReturn([
+                ['column_name' => 'id'],
+                ['column_name' => 'name'],
+                ['column_name' => 'updated_at'],
+            ]);
+
+        $inspector = new TableInspector($this->registry);
+        $orderColumn = $inspector->detectOrderColumn('hr', 'employees');
+
+        $this->assertEquals('updated_at DESC', $orderColumn);
+    }
 }

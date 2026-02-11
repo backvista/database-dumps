@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Service\Generator;
 
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 
 /**
  * Генерация INSERT statements с батчингом
@@ -38,6 +39,13 @@ class InsertGenerator
         $connection = $this->registry->getConnection($connectionName);
 
         $fullTable = $platform->getFullTableName($schema, $table);
+        $platformName = $connection->getPlatformName();
+        $isOracle = $platformName === PlatformFactory::ORACLE || $platformName === PlatformFactory::OCI;
+
+        if ($isOracle) {
+            return $this->generateOracleInserts($fullTable, $rows, $platform, $connection);
+        }
+
         $batches = array_chunk($rows, self::BATCH_SIZE);
         $sql = '';
         $batchNum = 1;
@@ -88,6 +96,39 @@ class InsertGenerator
         }
 
         $sql .= implode(",\n", $values) . ";\n";
+
+        return $sql;
+    }
+
+    /**
+     * Сгенерировать отдельный INSERT на каждую строку (Oracle не поддерживает multi-row INSERT)
+     *
+     * @param string $fullTable
+     * @param array<array<string, mixed>> $rows
+     * @param \BackVista\DatabaseDumps\Contract\DatabasePlatformInterface $platform
+     * @param \BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface $connection
+     * @return string
+     */
+    private function generateOracleInserts(string $fullTable, array $rows, $platform, $connection): string
+    {
+        $columns = array_keys($rows[0]);
+        $columnsList = implode(', ', array_map(function ($col) use ($platform) {
+            return $platform->quoteIdentifier($col);
+        }, $columns));
+
+        $sql = "-- " . count($rows) . " rows\n";
+
+        foreach ($rows as $row) {
+            $escapedValues = [];
+            foreach ($row as $value) {
+                if ($value === null) {
+                    $escapedValues[] = 'NULL';
+                } else {
+                    $escapedValues[] = $connection->quote($value);
+                }
+            }
+            $sql .= "INSERT INTO {$fullTable} ({$columnsList}) VALUES (" . implode(', ', $escapedValues) . ");\n";
+        }
 
         return $sql;
     }

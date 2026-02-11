@@ -7,6 +7,8 @@ use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\OraclePlatform;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
@@ -175,6 +177,37 @@ class DataFetcherTest extends TestCase
             ->with($this->logicalAnd(
                 $this->stringContains('WHERE (status = 1) AND (' . $cascadeWhereValue . ')'),
                 $this->stringContains('SELECT * FROM "public"."orders"')
+            ))
+            ->willReturn([]);
+
+        $fetcher->fetch($config);
+    }
+
+    public function testFetchWithLimitOracle(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $platform = new OraclePlatform();
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $dumpConfig = new DumpConfig([], []);
+        $fetcher = new DataFetcher($registry, $cascadeResolver, $dumpConfig);
+
+        $config = new TableConfig('clients', 'clients', 100);
+
+        $connection
+            ->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->with($this->logicalAnd(
+                $this->stringContains('FETCH FIRST 100 ROWS ONLY'),
+                $this->logicalNot($this->stringContains('LIMIT'))
             ))
             ->willReturn([]);
 

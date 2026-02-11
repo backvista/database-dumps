@@ -3,6 +3,7 @@
 namespace BackVista\DatabaseDumps\Service\Faker;
 
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 
 /**
  * Определяет паттерны персональных данных в колонках таблицы
@@ -89,7 +90,12 @@ class PatternDetector
 
         $fullTable = $platform->getFullTableName($schema, $table);
         $randomFunc = $platform->getRandomFunctionSql();
-        $sql = "SELECT * FROM {$fullTable} ORDER BY {$randomFunc} LIMIT " . self::SAMPLE_SIZE;
+        $platformName = $connection->getPlatformName();
+        if ($platformName === PlatformFactory::ORACLE || $platformName === PlatformFactory::OCI) {
+            $sql = "SELECT * FROM {$fullTable} ORDER BY {$randomFunc} FETCH FIRST " . self::SAMPLE_SIZE . " ROWS ONLY";
+        } else {
+            $sql = "SELECT * FROM {$fullTable} ORDER BY {$randomFunc} LIMIT " . self::SAMPLE_SIZE;
+        }
 
         $rows = $connection->fetchAllAssociative($sql);
 
