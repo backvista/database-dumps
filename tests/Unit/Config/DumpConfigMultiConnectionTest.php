@@ -8,7 +8,8 @@ use BackVista\DatabaseDumps\Config\TableConfig;
 
 class DumpConfigMultiConnectionTest extends TestCase
 {
-    private DumpConfig $config;
+    /** @var DumpConfig */
+    private $config;
 
     protected function setUp(): void
     {

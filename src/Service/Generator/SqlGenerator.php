@@ -9,9 +9,12 @@ use BackVista\DatabaseDumps\Config\TableConfig;
  */
 class SqlGenerator
 {
-    private TruncateGenerator $truncateGenerator;
-    private InsertGenerator $insertGenerator;
-    private SequenceGenerator $sequenceGenerator;
+    /** @var TruncateGenerator */
+    private $truncateGenerator;
+    /** @var InsertGenerator */
+    private $insertGenerator;
+    /** @var SequenceGenerator */
+    private $sequenceGenerator;
 
     public function __construct(
         TruncateGenerator $truncateGenerator,

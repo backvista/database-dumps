@@ -13,10 +13,14 @@ use BackVista\DatabaseDumps\Service\Parser\SqlParser;
  */
 class ScriptExecutor
 {
-    private ConnectionRegistryInterface $registry;
-    private FileSystemInterface $fileSystem;
-    private SqlParser $parser;
-    private LoggerInterface $logger;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
+    /** @var FileSystemInterface */
+    private $fileSystem;
+    /** @var SqlParser */
+    private $parser;
+    /** @var LoggerInterface */
+    private $logger;
 
     public function __construct(
         ConnectionRegistryInterface $registry,

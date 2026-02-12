@@ -13,8 +13,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class DumpExportCommand extends Command
 {
-    private DatabaseDumper $dumper;
-    private TableConfigResolver $configResolver;
+    /** @var DatabaseDumper */
+    private $dumper;
+    /** @var TableConfigResolver */
+    private $configResolver;
 
     public function __construct(
         DatabaseDumper $dumper,

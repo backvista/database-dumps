@@ -12,7 +12,8 @@ class TransactionManagerTest extends TestCase
 {
     /** @var MockObject&DatabaseConnectionInterface */
     private $connection;
-    private TransactionManager $manager;
+    /** @var TransactionManager */
+    private $manager;
 
     protected function setUp(): void
     {

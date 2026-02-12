@@ -7,7 +7,8 @@ namespace BackVista\DatabaseDumps\Service\Parser;
  */
 class SqlParser
 {
-    private StatementSplitter $splitter;
+    /** @var StatementSplitter */
+    private $splitter;
 
     public function __construct(StatementSplitter $splitter)
     {

@@ -10,7 +10,8 @@ use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
  */
 class TransactionManager
 {
-    private ConnectionRegistryInterface $registry;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
 
     public function __construct(ConnectionRegistryInterface $registry)
     {

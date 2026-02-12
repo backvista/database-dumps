@@ -17,17 +17,17 @@ class DumpConfig
     /**
      * @var array<string, array<string>> Полный экспорт по схемам
      */
-    private array $fullExport;
+    private $fullExport;
 
     /**
      * @var array<string, array<string, array<string, mixed>>> Частичный экспорт с условиями
      */
-    private array $partialExport;
+    private $partialExport;
 
     /**
      * @var array<string, DumpConfig> Конфигурации дополнительных подключений
      */
-    private array $connections;
+    private $connections;
 
     /** @var FakerConfig|null */
     private $fakerConfig;

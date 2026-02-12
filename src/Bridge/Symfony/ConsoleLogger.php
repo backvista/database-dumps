@@ -10,7 +10,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  */
 class ConsoleLogger implements LoggerInterface
 {
-    private SymfonyStyle $io;
+    /** @var SymfonyStyle */
+    private $io;
 
     public function __construct(SymfonyStyle $io)
     {

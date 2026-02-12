@@ -7,7 +7,8 @@ use BackVista\DatabaseDumps\Service\Parser\StatementSplitter;
 
 class StatementSplitterTest extends TestCase
 {
-    private StatementSplitter $splitter;
+    /** @var StatementSplitter */
+    private $splitter;
 
     protected function setUp(): void
     {

@@ -9,7 +9,8 @@ use BackVista\DatabaseDumps\Config\TableConfig;
 
 class DumpConfigTest extends TestCase
 {
-    private DumpConfig $config;
+    /** @var DumpConfig */
+    private $config;
 
     protected function setUp(): void
     {
@@ -23,7 +24,7 @@ class DumpConfigTest extends TestCase
                     'clients' => [TableConfig::KEY_LIMIT => 100, TableConfig::KEY_ORDER_BY => 'created_at DESC'],
                     'clients_attr' => [TableConfig::KEY_LIMIT => 500]
                 ]
-            ],
+            ]
         );
     }
 

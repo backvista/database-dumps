@@ -10,7 +10,8 @@ use BackVista\DatabaseDumps\Service\Dumper\TableConfigResolver;
 
 class TableConfigResolverTest extends TestCase
 {
-    private TableConfigResolver $resolver;
+    /** @var TableConfigResolver */
+    private $resolver;
 
     protected function setUp(): void
     {
@@ -57,7 +58,7 @@ class TableConfigResolverTest extends TestCase
 
         $this->assertCount(2, $tables);
 
-        $tableNames = array_map(fn($config) => $config->getTable(), $tables);
+        $tableNames = array_map(function ($config) { return $config->getTable(); }, $tables);
         $this->assertContains('users', $tableNames);
         $this->assertContains('roles', $tableNames);
     }
@@ -68,7 +69,7 @@ class TableConfigResolverTest extends TestCase
 
         $this->assertGreaterThanOrEqual(3, count($tables));
 
-        $fullNames = array_map(fn($config) => $config->getFullTableName(), $tables);
+        $fullNames = array_map(function ($config) { return $config->getFullTableName(); }, $tables);
         $this->assertContains('users.users', $fullNames);
         $this->assertContains('clients.clients', $fullNames);
     }

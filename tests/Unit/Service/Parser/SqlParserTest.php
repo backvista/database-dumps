@@ -8,7 +8,8 @@ use BackVista\DatabaseDumps\Service\Parser\StatementSplitter;
 
 class SqlParserTest extends TestCase
 {
-    private SqlParser $parser;
+    /** @var SqlParser */
+    private $parser;
 
     protected function setUp(): void
     {

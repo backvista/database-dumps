@@ -10,12 +10,12 @@ class EnvironmentConfig
     /**
      * @var string Текущее окружение (dev, test, prod, predprod)
      */
-    private string $currentEnv;
+    private $currentEnv;
 
     /**
      * @var array<string> Список production окружений
      */
-    private array $productionEnvs;
+    private $productionEnvs;
 
     /**
      * @param string $currentEnv Текущее окружение (dev, test, prod, predprod)

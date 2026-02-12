@@ -11,7 +11,8 @@ use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
  */
 class TableConfigResolver
 {
-    private DumpConfig $dumpConfig;
+    /** @var DumpConfig */
+    private $dumpConfig;
 
     public function __construct(DumpConfig $dumpConfig)
     {

@@ -9,7 +9,8 @@ use BackVista\DatabaseDumps\Config\EnvironmentConfig;
  */
 class EnvironmentChecker
 {
-    private EnvironmentConfig $config;
+    /** @var EnvironmentConfig */
+    private $config;
 
     public function __construct(EnvironmentConfig $config)
     {

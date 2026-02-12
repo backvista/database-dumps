@@ -11,7 +11,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 class DbInitCommand extends Command
 {
-    private DatabaseImporter $importer;
+    /** @var DatabaseImporter */
+    private $importer;
 
     public function __construct(DatabaseImporter $importer)
     {

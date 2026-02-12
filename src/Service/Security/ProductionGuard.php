@@ -9,7 +9,8 @@ use BackVista\DatabaseDumps\Exception\ProductionEnvironmentException;
  */
 class ProductionGuard
 {
-    private EnvironmentChecker $environmentChecker;
+    /** @var EnvironmentChecker */
+    private $environmentChecker;
 
     public function __construct(EnvironmentChecker $environmentChecker)
     {

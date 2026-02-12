@@ -19,15 +19,24 @@ class DatabaseImporter
     public const BEFORE_EXEC_DIR = 'database/before_exec';
     public const AFTER_EXEC_DIR = 'database/after_exec';
 
-    private ConnectionRegistryInterface $registry;
-    private DumpConfig $dumpConfig;
-    private FileSystemInterface $fileSystem;
-    private ProductionGuard $productionGuard;
-    private TransactionManager $transactionManager;
-    private ScriptExecutor $scriptExecutor;
-    private SqlParser $parser;
-    private LoggerInterface $logger;
-    private string $projectDir;
+    /** @var ConnectionRegistryInterface */
+    private $registry;
+    /** @var DumpConfig */
+    private $dumpConfig;
+    /** @var FileSystemInterface */
+    private $fileSystem;
+    /** @var ProductionGuard */
+    private $productionGuard;
+    /** @var TransactionManager */
+    private $transactionManager;
+    /** @var ScriptExecutor */
+    private $scriptExecutor;
+    /** @var SqlParser */
+    private $parser;
+    /** @var LoggerInterface */
+    private $logger;
+    /** @var string */
+    private $projectDir;
 
     /** @var TableDependencyResolver */
     private $dependencyResolver;

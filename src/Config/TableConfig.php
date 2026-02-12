@@ -13,11 +13,16 @@ class TableConfig
     public const KEY_ORDER_BY = 'order_by';
     public const KEY_CASCADE_FROM = 'cascade_from';
 
-    private string $schema;
-    private string $table;
-    private ?int $limit;
-    private ?string $where;
-    private ?string $orderBy;
+    /** @var string */
+    private $schema;
+    /** @var string */
+    private $table;
+    /** @var int|null */
+    private $limit;
+    /** @var string|null */
+    private $where;
+    /** @var string|null */
+    private $orderBy;
     /** @var string|null */
     private $connectionName;
     /** @var array<int, array{parent: string, fk_column: string, parent_column: string}>|null */

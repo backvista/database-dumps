@@ -11,7 +11,8 @@ use BackVista\DatabaseDumps\Platform\PlatformFactory;
  */
 class DoctrineDbalAdapter implements DatabaseConnectionInterface
 {
-    private Connection $connection;
+    /** @var Connection */
+    private $connection;
 
     public function __construct(Connection $connection)
     {
