@@ -1,7 +1,7 @@
 # Database Dumps Package
 
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
-[![PHP Version](https://img.shields.io/badge/php-%5E7.4%20%7C%20%5E8.0-blue)]()
+[![PHP Version](https://img.shields.io/badge/php-%5E7.2%20%7C%20%5E8.0-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)]()
 
 **[Русский](#русский)** | **[English](#english)**
@@ -744,20 +744,20 @@ composer cs-fix
 
 **Обязательные:**
 
-- PHP ^7.4 | ^8.0
-- `symfony/yaml` ^5.4 | ^6.0 | ^7.0
-- `symfony/finder` ^5.4 | ^6.0 | ^7.0
+- PHP ^7.2 | ^8.0
+- `symfony/yaml` ^4.4 | ^5.4 | ^6.0 | ^7.0
+- `symfony/finder` ^4.4 | ^5.4 | ^6.0 | ^7.0
 
 **Опциональные (зависят от фреймворка):**
 
 | Зависимость | Для чего нужна |
 |---|---|
 | `doctrine/dbal` ^2.13 \| ^3.0 \| ^4.0 | Адаптер Doctrine DBAL (Symfony) |
-| `symfony/console` ^5.4 \| ^6.0 \| ^7.0 | Консольные команды Symfony |
+| `symfony/console` ^4.4 \| ^5.4 \| ^6.0 \| ^7.0 | Консольные команды Symfony |
 | `symfony/http-kernel` ^5.4 \| ^6.0 \| ^7.0 | Регистрация бандла Symfony |
-| `illuminate/support` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Сервис-провайдер Laravel |
-| `illuminate/console` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Artisan-команды Laravel |
-| `illuminate/database` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Адаптер БД Laravel |
+| `illuminate/support` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Сервис-провайдер Laravel |
+| `illuminate/console` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Artisan-команды Laravel |
+| `illuminate/database` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Адаптер БД Laravel |
 
 ## Лицензия
 
@@ -1503,20 +1503,20 @@ Then run `composer update backvista/database-dumps` — Composer will create a s
 
 **Required:**
 
-- PHP ^7.4 | ^8.0
-- `symfony/yaml` ^5.4 | ^6.0 | ^7.0
-- `symfony/finder` ^5.4 | ^6.0 | ^7.0
+- PHP ^7.2 | ^8.0
+- `symfony/yaml` ^4.4 | ^5.4 | ^6.0 | ^7.0
+- `symfony/finder` ^4.4 | ^5.4 | ^6.0 | ^7.0
 
 **Optional (depends on framework):**
 
 | Dependency | What it's for |
 |---|---|
 | `doctrine/dbal` ^2.13 \| ^3.0 \| ^4.0 | Doctrine DBAL adapter (Symfony) |
-| `symfony/console` ^5.4 \| ^6.0 \| ^7.0 | Symfony console commands |
+| `symfony/console` ^4.4 \| ^5.4 \| ^6.0 \| ^7.0 | Symfony console commands |
 | `symfony/http-kernel` ^5.4 \| ^6.0 \| ^7.0 | Symfony bundle registration |
-| `illuminate/support` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel service provider |
-| `illuminate/console` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel artisan commands |
-| `illuminate/database` ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel DB adapter |
+| `illuminate/support` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel service provider |
+| `illuminate/console` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel artisan commands |
+| `illuminate/database` ^7.0 \| ^8.0 \| ^9.0 \| ^10.0 \| ^11.0 | Laravel DB adapter |
 
 ## License
 
