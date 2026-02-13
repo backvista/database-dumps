@@ -139,7 +139,7 @@ class ConfigGeneratorTest extends TestCase
         $this->assertEquals(500, $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders'][TableConfig::KEY_LIMIT]);
         $this->assertEquals('created_at DESC', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders'][TableConfig::KEY_ORDER_BY]);
 
-        $this->assertStringContainsString(ConfigGenerator::WHERE_HINT, $writtenContent);
+        $this->assertEquals('1=1', $parsed[DumpConfig::KEY_PARTIAL_EXPORT]['public']['orders'][TableConfig::KEY_WHERE]);
     }
 
     public function testGenerateSkipsServiceTables(): void

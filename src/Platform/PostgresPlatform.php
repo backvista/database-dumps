@@ -60,4 +60,9 @@ class PostgresPlatform implements DatabasePlatformInterface
     {
         return 'RANDOM()';
     }
+
+    public function getLimitSql(int $limit): string
+    {
+        return 'LIMIT ' . $limit;
+    }
 }

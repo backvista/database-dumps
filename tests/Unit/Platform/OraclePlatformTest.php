@@ -59,4 +59,10 @@ class OraclePlatformTest extends TestCase
     {
         $this->assertEquals('DBMS_RANDOM.VALUE', $this->platform->getRandomFunctionSql());
     }
+
+    public function testGetLimitSql(): void
+    {
+        $this->assertEquals('FETCH FIRST 100 ROWS ONLY', $this->platform->getLimitSql(100));
+        $this->assertEquals('FETCH FIRST 1 ROWS ONLY', $this->platform->getLimitSql(1));
+    }
 }

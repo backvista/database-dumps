@@ -33,4 +33,9 @@ interface DatabasePlatformInterface
      * Получить SQL-функцию случайного числа для платформы
      */
     public function getRandomFunctionSql(): string;
+
+    /**
+     * Получить SQL-выражение для ограничения количества строк
+     */
+    public function getLimitSql(int $limit): string;
 }

@@ -37,4 +37,9 @@ class OraclePlatform implements DatabasePlatformInterface
     {
         return 'DBMS_RANDOM.VALUE';
     }
+
+    public function getLimitSql(int $limit): string
+    {
+        return 'FETCH FIRST ' . $limit . ' ROWS ONLY';
+    }
 }

@@ -399,7 +399,7 @@ php artisan dbdump:prepare-config new
 
 **Как распределяются таблицы:**
 - Строк <= порога — `full_export`
-- Строк > порога — `partial_export` (с limit и автоопределённой сортировкой)
+- Строк > порога — `partial_export` (с limit, автоопределённой сортировкой и шаблоном `where: "1=1"` для удобства редактирования)
 - Пустые таблицы — пропускаются
 - Служебные таблицы (migrations, sessions, cache_*, telescope_*, oauth_*, audit_*) — пропускаются
 
@@ -1158,7 +1158,7 @@ php artisan dbdump:prepare-config new
 
 **How tables are sorted:**
 - Rows <= threshold — `full_export`
-- Rows > threshold — `partial_export` (with limit and auto-detected sorting)
+- Rows > threshold — `partial_export` (with limit, auto-detected sorting and `where: "1=1"` template for easy customization)
 - Empty tables — skipped
 - Service tables (migrations, sessions, cache_*, telescope_*, oauth_*, audit_*) — skipped
 

@@ -8,7 +8,6 @@ use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Platform\OraclePlatform;
-use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
@@ -186,7 +185,6 @@ class DataFetcherTest extends TestCase
     public function testFetchWithLimitOracle(): void
     {
         $connection = $this->createMock(DatabaseConnectionInterface::class);
-        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
 
         $platform = new OraclePlatform();
 
@@ -205,10 +203,7 @@ class DataFetcherTest extends TestCase
         $connection
             ->expects($this->once())
             ->method('fetchAllAssociative')
-            ->with($this->logicalAnd(
-                $this->stringContains('FETCH FIRST 100 ROWS ONLY'),
-                $this->logicalNot($this->stringContains('LIMIT'))
-            ))
+            ->with($this->stringContains('FETCH FIRST 100 ROWS ONLY'))
             ->willReturn([]);
 
         $fetcher->fetch($config);

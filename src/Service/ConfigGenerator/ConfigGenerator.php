@@ -16,8 +16,6 @@ use Symfony\Component\Yaml\Yaml;
  */
 class ConfigGenerator
 {
-    public const WHERE_HINT = 'where: "1=1"';
-
     public const MODE_ALL = 'all';
     public const MODE_SCHEMA = 'schema';
     public const MODE_NEW = 'new';
@@ -205,7 +203,6 @@ class ConfigGenerator
             $this->configSplitter->split($outputPath, $config);
         } else {
             $yaml = Yaml::dump($config, 4, 2);
-            $yaml = $this->addWhereHints($yaml);
             $this->fileSystem->write($outputPath, $yaml);
         }
 
@@ -303,6 +300,7 @@ class ConfigGenerator
                 $partialExport[$schema][$table] = [
                     TableConfig::KEY_LIMIT => $threshold,
                     TableConfig::KEY_ORDER_BY => $orderBy,
+                    TableConfig::KEY_WHERE => '1=1',
                 ];
                 $stats['partial']++;
             }
@@ -748,24 +746,6 @@ class ConfigGenerator
         }
 
         return $result;
-    }
-
-    /**
-     * Добавить закомментированные подсказки where после каждой строки order_by
-     */
-    private function addWhereHints(string $yaml): string
-    {
-        $lines = explode("\n", $yaml);
-        $result = [];
-
-        foreach ($lines as $line) {
-            $result[] = $line;
-            if (preg_match('/^(\s+)order_by:\s/', $line, $matches)) {
-                $result[] = $matches[1] . self::WHERE_HINT;
-            }
-        }
-
-        return implode("\n", $result);
     }
 
     /**

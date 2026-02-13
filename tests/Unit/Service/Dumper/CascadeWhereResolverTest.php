@@ -5,6 +5,7 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
+use BackVista\DatabaseDumps\Platform\OraclePlatform;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use PHPUnit\Framework\TestCase;
@@ -118,5 +119,29 @@ class CascadeWhereResolverTest extends TestCase
         // Should have nested subquery
         $this->assertStringContainsString('order_id IN (SELECT "id" FROM "public"."orders"', $result);
         $this->assertStringContainsString('user_id IN (SELECT "id" FROM "public"."users"', $result);
+    }
+
+    public function testResolveUsesOracleLimitSyntax(): void
+    {
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getPlatform')->willReturn(new OraclePlatform());
+        $resolver = new CascadeWhereResolver($registry);
+
+        $config = new TableConfig('public', 'orders', 500, null, 'id DESC', null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [
+                    TableConfig::KEY_LIMIT => 100,
+                    TableConfig::KEY_ORDER_BY => 'created_at DESC',
+                ],
+            ]]
+        );
+        $result = $resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('FETCH FIRST 100 ROWS ONLY', $result);
+        $this->assertStringNotContainsString('LIMIT', $result);
     }
 }

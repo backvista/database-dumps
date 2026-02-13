@@ -68,4 +68,10 @@ class MySqlPlatformTest extends TestCase
     {
         $this->assertEquals('RAND()', $this->platform->getRandomFunctionSql());
     }
+
+    public function testGetLimitSql(): void
+    {
+        $this->assertEquals('LIMIT 100', $this->platform->getLimitSql(100));
+        $this->assertEquals('LIMIT 1', $this->platform->getLimitSql(1));
+    }
 }

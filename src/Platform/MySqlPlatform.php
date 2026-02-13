@@ -45,4 +45,9 @@ class MySqlPlatform implements DatabasePlatformInterface
     {
         return 'RAND()';
     }
+
+    public function getLimitSql(int $limit): string
+    {
+        return 'LIMIT ' . $limit;
+    }
 }

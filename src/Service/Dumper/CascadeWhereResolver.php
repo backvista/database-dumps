@@ -121,7 +121,7 @@ class CascadeWhereResolver
 
         $limit = isset($parentTableConfig[TableConfig::KEY_LIMIT]) ? $parentTableConfig[TableConfig::KEY_LIMIT] : null;
         if ($limit !== null) {
-            $whereClause .= " LIMIT {$limit}";
+            $whereClause .= ' ' . $platform->getLimitSql((int) $limit);
         }
 
         return "{$fkColumn} IN ({$subquery}{$whereClause})";
