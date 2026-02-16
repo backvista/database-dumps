@@ -93,7 +93,9 @@ class DatabaseDumperTest extends TestCase
             ->willReturn(['public.users', 'public.orders', 'public.order_items']);
 
         $this->dataFetcher->method('fetch')->willReturn([]);
-        $this->sqlGenerator->method('generate')->willReturn('-- SQL');
+        $this->sqlGenerator->method('generateChunks')->willReturnCallback(function () {
+            yield '-- SQL';
+        });
 
         // Track the order of table exports via logger info calls
         $exportOrder = [];
@@ -146,9 +148,11 @@ class DatabaseDumperTest extends TestCase
         // SqlGenerator should receive the faked rows, not originals
         $this->sqlGenerator
             ->expects($this->once())
-            ->method('generate')
+            ->method('generateChunks')
             ->with($config, $fakedRows)
-            ->willReturn('-- SQL with faked data');
+            ->willReturnCallback(function () {
+                yield '-- SQL with faked data';
+            });
 
         $dumper = $this->createDumper($dumpConfig);
         $dumper->exportTable($config);
@@ -170,9 +174,11 @@ class DatabaseDumperTest extends TestCase
 
         $this->sqlGenerator
             ->expects($this->once())
-            ->method('generate')
+            ->method('generateChunks')
             ->with($config, $rows)
-            ->willReturn('-- SQL');
+            ->willReturnCallback(function () {
+                yield '-- SQL';
+            });
 
         $dumper = $this->createDumper($dumpConfig);
         $dumper->exportTable($config);
@@ -198,7 +204,9 @@ class DatabaseDumperTest extends TestCase
             ->with($this->stringContains('Цикл FK зависимостей'));
 
         $this->dataFetcher->method('fetch')->willReturn([]);
-        $this->sqlGenerator->method('generate')->willReturn('-- SQL');
+        $this->sqlGenerator->method('generateChunks')->willReturnCallback(function () {
+            yield '-- SQL';
+        });
 
         // Track the order — should be original order
         $exportOrder = [];
@@ -229,7 +237,9 @@ class DatabaseDumperTest extends TestCase
         $config = new TableConfig('public', 'users');
 
         $this->dataFetcher->method('fetch')->willReturn([]);
-        $this->sqlGenerator->method('generate')->willReturn('-- SQL');
+        $this->sqlGenerator->method('generateChunks')->willReturnCallback(function () {
+            yield '-- SQL';
+        });
 
         $this->fileSystem
             ->expects($this->once())
@@ -248,7 +258,9 @@ class DatabaseDumperTest extends TestCase
         $config = new TableConfig('public', 'users', null, null, null, 'secondary');
 
         $this->dataFetcher->method('fetch')->willReturn([]);
-        $this->sqlGenerator->method('generate')->willReturn('-- SQL');
+        $this->sqlGenerator->method('generateChunks')->willReturnCallback(function () {
+            yield '-- SQL';
+        });
 
         $this->fileSystem
             ->expects($this->once())
@@ -260,5 +272,39 @@ class DatabaseDumperTest extends TestCase
 
         $dumper = $this->createDumper();
         $dumper->exportTable($config);
+    }
+
+    public function testExportTableUsesStreamingWrite(): void
+    {
+        $config = new TableConfig('public', 'users');
+
+        $this->dataFetcher->method('fetch')->willReturn([]);
+        $this->sqlGenerator->method('generateChunks')->willReturnCallback(function () {
+            yield '-- header';
+            yield '-- batch 1';
+            yield '-- batch 2';
+        });
+
+        $expectedPath = '/tmp/project/database/dumps/public/users.sql';
+
+        // write() вызывается один раз для первого чанка
+        $this->fileSystem
+            ->expects($this->once())
+            ->method('write')
+            ->with($expectedPath, '-- header');
+
+        // append() вызывается для остальных чанков
+        $appendCalls = [];
+        $this->fileSystem
+            ->expects($this->exactly(2))
+            ->method('append')
+            ->willReturnCallback(function ($path, $content) use (&$appendCalls) {
+                $appendCalls[] = $content;
+            });
+
+        $dumper = $this->createDumper();
+        $dumper->exportTable($config);
+
+        $this->assertEquals(['-- batch 1', '-- batch 2'], $appendCalls);
     }
 }

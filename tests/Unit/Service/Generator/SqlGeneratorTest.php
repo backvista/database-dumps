@@ -83,4 +83,54 @@ class SqlGeneratorTest extends TestCase
         $this->assertStringContainsString('Дата экспорта:', $sql);
         $this->assertMatchesRegularExpression('/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/', $sql);
     }
+
+    public function testGenerateChunksYieldsHeaderThenInsertsThenFooter(): void
+    {
+        $config = new TableConfig('users', 'users');
+        $rows = [
+            ['id' => 1, 'name' => 'User 1'],
+            ['id' => 2, 'name' => 'User 2']
+        ];
+
+        $chunks = iterator_to_array($this->generator->generateChunks($config, $rows));
+
+        // Первый чанк: заголовок + TRUNCATE
+        $this->assertStringContainsString('Дамп таблицы: users.users', $chunks[0]);
+        $this->assertStringContainsString('TRUNCATE TABLE', $chunks[0]);
+        $this->assertStringContainsString('Режим: full', $chunks[0]);
+
+        // Второй чанк: INSERT батч
+        $this->assertStringContainsString('INSERT INTO', $chunks[1]);
+        $this->assertStringContainsString('Batch 1', $chunks[1]);
+
+        // Последний чанк: sequence reset
+        $lastChunk = $chunks[count($chunks) - 1];
+        $this->assertStringContainsString('Сброс sequences', $lastChunk);
+    }
+
+    public function testGenerateChunksPartialExport(): void
+    {
+        $config = new TableConfig('clients', 'clients', 100);
+        $rows = [
+            ['id' => 1, 'name' => 'Client 1']
+        ];
+
+        $chunks = iterator_to_array($this->generator->generateChunks($config, $rows));
+
+        $this->assertStringContainsString('Режим: partial (limit 100)', $chunks[0]);
+    }
+
+    public function testGenerateChunksEmptyRows(): void
+    {
+        $config = new TableConfig('users', 'users');
+
+        $chunks = iterator_to_array($this->generator->generateChunks($config, []));
+
+        // Заголовок + TRUNCATE
+        $this->assertStringContainsString('Дамп таблицы: users.users', $chunks[0]);
+        $this->assertStringContainsString('TRUNCATE TABLE', $chunks[0]);
+
+        // Пустая таблица — сообщение
+        $this->assertStringContainsString('Таблица пуста', $chunks[1]);
+    }
 }

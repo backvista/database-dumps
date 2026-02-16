@@ -214,4 +214,75 @@ class InsertGeneratorTest extends TestCase
         $this->assertStringContainsString('NULL', $sql);
         $this->assertEquals(1, substr_count($sql, 'INSERT INTO'));
     }
+
+    public function testGenerateChunksYieldsEmptyMessage(): void
+    {
+        $chunks = iterator_to_array($this->generator->generateChunks('users', 'users', []));
+
+        $this->assertCount(1, $chunks);
+        $this->assertStringContainsString('Таблица пуста', $chunks[0]);
+    }
+
+    public function testGenerateChunksYieldsSingleBatch(): void
+    {
+        $rows = [
+            ['id' => 1, 'name' => 'User 1'],
+            ['id' => 2, 'name' => 'User 2']
+        ];
+
+        $chunks = iterator_to_array($this->generator->generateChunks('users', 'users', $rows));
+
+        $this->assertCount(1, $chunks);
+        $this->assertStringContainsString('Batch 1 (2 rows)', $chunks[0]);
+        $this->assertStringContainsString('INSERT INTO', $chunks[0]);
+    }
+
+    public function testGenerateChunksYieldsMultipleBatches(): void
+    {
+        $rows = [];
+        for ($i = 1; $i <= 2500; $i++) {
+            $rows[] = ['id' => $i, 'name' => "User {$i}"];
+        }
+
+        $chunks = iterator_to_array($this->generator->generateChunks('users', 'users', $rows));
+
+        $this->assertCount(3, $chunks);
+        $this->assertStringContainsString('Batch 1 (1000 rows)', $chunks[0]);
+        $this->assertStringContainsString('Batch 2 (1000 rows)', $chunks[1]);
+        $this->assertStringContainsString('Batch 3 (500 rows)', $chunks[2]);
+
+        // Каждый чанк содержит свой INSERT
+        foreach ($chunks as $chunk) {
+            $this->assertStringContainsString('INSERT INTO', $chunk);
+        }
+    }
+
+    public function testGenerateChunksOracleYieldsChunks(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $platform = new OraclePlatform();
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $generator = new InsertGenerator($registry);
+
+        $rows = [
+            ['id' => 1, 'name' => 'User 1'],
+            ['id' => 2, 'name' => 'User 2'],
+            ['id' => 3, 'name' => 'User 3']
+        ];
+
+        $chunks = iterator_to_array($generator->generateChunks('users', 'users', $rows));
+
+        // 3 строки < BATCH_SIZE → один чанк
+        $this->assertCount(1, $chunks);
+        $this->assertEquals(3, substr_count($chunks[0], 'INSERT INTO'));
+    }
 }

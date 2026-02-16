@@ -72,6 +72,15 @@ class FileSystemHelper implements FileSystemInterface
         return is_dir($path);
     }
 
+    public function append(string $path, string $content): void
+    {
+        $result = file_put_contents($path, $content, FILE_APPEND);
+
+        if ($result === false) {
+            throw new \RuntimeException("Не удалось дописать в файл: {$path}");
+        }
+    }
+
     public function getFileSize(string $path): int
     {
         if (!$this->exists($path)) {

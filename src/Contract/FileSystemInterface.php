@@ -42,6 +42,11 @@ interface FileSystemInterface
     public function isDirectory(string $path): bool;
 
     /**
+     * Дописать содержимое в файл
+     */
+    public function append(string $path, string $content): void;
+
+    /**
      * Получить размер файла в байтах
      */
     public function getFileSize(string $path): int;

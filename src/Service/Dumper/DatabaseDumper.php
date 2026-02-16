@@ -141,13 +141,19 @@ class DatabaseDumper
                 );
             }
 
-            // 3. Генерация SQL
-            $sql = $this->sqlGenerator->generate($config, $rows);
-
-            // 4. Сохранение файла
+            // 3. Потоковая генерация SQL и запись на диск
             $filename = $this->buildDumpPath($config);
             $this->ensureDirectoryExists(dirname($filename));
-            $this->fileSystem->write($filename, $sql);
+
+            $first = true;
+            foreach ($this->sqlGenerator->generateChunks($config, $rows) as $chunk) {
+                if ($first) {
+                    $this->fileSystem->write($filename, $chunk);
+                    $first = false;
+                } else {
+                    $this->fileSystem->append($filename, $chunk);
+                }
+            }
 
             $size = $this->fileSystem->getFileSize($filename);
             $this->logger->info("{$prefix}{$tableName} ... OK ({$this->formatBytes($size)})");

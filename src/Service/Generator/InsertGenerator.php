@@ -61,6 +61,46 @@ class InsertGenerator
     }
 
     /**
+     * Потоковая генерация INSERT statements по батчам (Generator для экономии памяти)
+     *
+     * @param string $schema
+     * @param string $table
+     * @param array<array<string, mixed>> $rows
+     * @param string|null $connectionName
+     * @return \Generator<string>
+     */
+    public function generateChunks($schema, $table, array $rows, $connectionName = null)
+    {
+        if (empty($rows)) {
+            yield "-- Таблица пуста, нет данных для импорта\n";
+            return;
+        }
+
+        $platform = $this->registry->getPlatform($connectionName);
+        $connection = $this->registry->getConnection($connectionName);
+
+        $fullTable = $platform->getFullTableName($schema, $table);
+        $platformName = $connection->getPlatformName();
+        $isOracle = $platformName === PlatformFactory::ORACLE || $platformName === PlatformFactory::OCI;
+
+        if ($isOracle) {
+            foreach (array_chunk($rows, self::BATCH_SIZE) as $chunk) {
+                yield $this->generateOracleInserts($fullTable, $chunk, $platform, $connection);
+            }
+            return;
+        }
+
+        $batchNum = 1;
+        foreach (array_chunk($rows, self::BATCH_SIZE) as $batch) {
+            $sql = "-- Batch {$batchNum} (" . count($batch) . " rows)\n";
+            $sql .= $this->generateBatchInsert($fullTable, $batch, $platform, $connection);
+            $sql .= "\n";
+            yield $sql;
+            $batchNum++;
+        }
+    }
+
+    /**
      * Сгенерировать INSERT для одного батча
      *
      * @param string $fullTable

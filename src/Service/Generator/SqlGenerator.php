@@ -63,4 +63,44 @@ class SqlGenerator
 
         return $sql;
     }
+
+    /**
+     * Потоковая генерация SQL дампа таблицы (Generator для экономии памяти)
+     *
+     * @param TableConfig $config
+     * @param array<array<string, mixed>> $rows
+     * @return \Generator<string>
+     */
+    public function generateChunks(TableConfig $config, array $rows)
+    {
+        $schema = $config->getSchema();
+        $table = $config->getTable();
+        $connectionName = $config->getConnectionName();
+
+        $header = "-- Дамп таблицы: {$schema}.{$table}\n";
+        $header .= "-- Дата экспорта: " . date('Y-m-d H:i:s') . "\n";
+        $header .= "-- Количество записей: " . count($rows) . "\n";
+
+        if ($config->isPartialExport()) {
+            $header .= "-- Режим: partial (limit {$config->getLimit()})\n";
+        } else {
+            $header .= "-- Режим: full\n";
+        }
+
+        $header .= "\n";
+
+        $header .= $this->truncateGenerator->generate($schema, $table, $connectionName);
+        $header .= "\n";
+
+        yield $header;
+
+        foreach ($this->insertGenerator->generateChunks($schema, $table, $rows, $connectionName) as $chunk) {
+            yield $chunk;
+        }
+
+        $footer = $this->sequenceGenerator->generate($schema, $table, $connectionName);
+        if ($footer !== '') {
+            yield $footer;
+        }
+    }
 }
