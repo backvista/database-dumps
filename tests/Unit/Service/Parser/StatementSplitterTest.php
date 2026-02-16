@@ -133,11 +133,12 @@ SQL;
         $this->assertStringContainsString("'it''s a test'", $statements[0]);
     }
 
-    public function testSplitWithBackslashEscapedQuotes(): void
+    public function testSplitWithBackslashEscapedQuotesMysql(): void
     {
+        // MySQL-style: \' — экранированная кавычка
         $sql = "INSERT INTO t (data) VALUES ('it\\'s a test'); SELECT 1;";
 
-        $statements = $this->splitter->split($sql);
+        $statements = $this->splitter->split($sql, true);
 
         $this->assertCount(2, $statements);
         $this->assertStringContainsString("'it\\'s a test'", $statements[0]);
@@ -151,5 +152,77 @@ SQL;
 
         $this->assertCount(2, $statements);
         $this->assertStringContainsString("'/* not a comment */'", $statements[0]);
+    }
+
+    public function testSplitPostgresBackslashIsLiteral(): void
+    {
+        // PostgreSQL: \ — литеральный символ, ' — закрывающая кавычка
+        // Значение: path\  →  PDO::quote() → 'path\'
+        $sql = "INSERT INTO t (data) VALUES ('path\\'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql, false);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'path\\'", $statements[0]);
+        $this->assertEquals('SELECT 1', $statements[1]);
+    }
+
+    public function testSplitPostgresBackslashBeforeEscapedQuote(): void
+    {
+        // PostgreSQL: \'' — литеральный backslash + экранированная кавычка ''
+        // Значение: it's\path  →  'it''s\path'
+        $sql = "INSERT INTO t (data) VALUES ('it''s\\path'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql, false);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'it''s\\path'", $statements[0]);
+    }
+
+    public function testSplitPostgresMultilineWithBackslash(): void
+    {
+        // Реальный сценарий: Jira-контент с переносами строк и обратными слэшами
+        $sql = "INSERT INTO changelog (id, description) VALUES (1, 'C:\\Users\\test\nновая строка'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql, false);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("C:\\Users\\test\nновая строка", $statements[0]);
+    }
+
+    public function testSplitMysqlBackslashEscapedBackslash(): void
+    {
+        // MySQL: \\ — экранированный backslash, затем ' — закрывающая кавычка
+        // Значение: path\  →  PDO::quote() → 'path\\'
+        $sql = "INSERT INTO t (data) VALUES ('path\\\\'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql, true);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'path\\\\'", $statements[0]);
+        $this->assertEquals('SELECT 1', $statements[1]);
+    }
+
+    public function testSplitMysqlBackslashQuoteEscape(): void
+    {
+        // MySQL: \' — экранированная кавычка внутри строки
+        $sql = "INSERT INTO t (data) VALUES ('it\\'s a test'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql, true);
+
+        $this->assertCount(2, $statements);
+        $this->assertStringContainsString("'it\\'s a test'", $statements[0]);
+        $this->assertEquals('SELECT 1', $statements[1]);
+    }
+
+    public function testSplitDefaultModeIsNoBackslashEscapes(): void
+    {
+        // По умолчанию backslashEscapes=false (PostgreSQL-совместимо)
+        $sql = "INSERT INTO t (data) VALUES ('path\\'); SELECT 1;";
+
+        $statements = $this->splitter->split($sql);
+
+        $this->assertCount(2, $statements);
+        $this->assertEquals('SELECT 1', $statements[1]);
     }
 }

@@ -18,11 +18,13 @@ class SqlParser
     /**
      * Распарсить SQL файл на отдельные statements
      *
+     * @param string $sqlContent
+     * @param bool $backslashEscapes Включить MySQL-style backslash-экранирование
      * @return array<string>
      */
-    public function parseFile(string $sqlContent): array
+    public function parseFile(string $sqlContent, $backslashEscapes = false): array
     {
-        return $this->splitter->split($sqlContent);
+        return $this->splitter->split($sqlContent, $backslashEscapes);
     }
 
     /**

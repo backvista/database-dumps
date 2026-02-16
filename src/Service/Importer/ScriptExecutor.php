@@ -6,6 +6,7 @@ use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Service\Parser\SqlParser;
 
 /**
@@ -63,25 +64,31 @@ class ScriptExecutor
         // Сортировка для предсказуемого порядка выполнения
         sort($files);
 
+        $platformName = $connection->getPlatformName();
+        $backslashEscapes = $platformName === PlatformFactory::MYSQL
+            || $platformName === PlatformFactory::MARIADB;
+
         $total = count($files);
         $current = 0;
 
         foreach ($files as $file) {
             $current++;
-            $this->executeScript($connection, $file, $current, $total);
+            $this->executeScript($connection, $file, $current, $total, $backslashEscapes);
         }
     }
 
     /**
      * Выполнить один SQL скрипт
+     *
+     * @param bool $backslashEscapes
      */
-    private function executeScript(DatabaseConnectionInterface $connection, string $filePath, int $current, int $total): void
+    private function executeScript(DatabaseConnectionInterface $connection, string $filePath, int $current, int $total, $backslashEscapes = false): void
     {
         $filename = basename($filePath);
 
         try {
             $sql = $this->fileSystem->read($filePath);
-            $statements = $this->parser->parseFile($sql);
+            $statements = $this->parser->parseFile($sql, $backslashEscapes);
 
             foreach ($statements as $statement) {
                 if (!empty(trim($statement))) {

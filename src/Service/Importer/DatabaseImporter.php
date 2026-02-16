@@ -7,6 +7,7 @@ use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\FileSystemInterface;
 use BackVista\DatabaseDumps\Contract\LoggerInterface;
 use BackVista\DatabaseDumps\Exception\ImportFailedException;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Service\Graph\TableDependencyResolver;
 use BackVista\DatabaseDumps\Service\Parser\SqlParser;
 use BackVista\DatabaseDumps\Service\Security\ProductionGuard;
@@ -176,10 +177,13 @@ class DatabaseImporter
         $current = 0;
 
         $connection = $this->registry->getConnection($connectionName);
+        $platformName = $connection->getPlatformName();
+        $backslashEscapes = $platformName === PlatformFactory::MYSQL
+            || $platformName === PlatformFactory::MARIADB;
 
         foreach ($filteredFiles as $file) {
             $current++;
-            $this->importDumpFile($file, $current, $total, $connection);
+            $this->importDumpFile($file, $current, $total, $connection, $backslashEscapes);
         }
     }
 
@@ -267,8 +271,9 @@ class DatabaseImporter
      * Импортировать один файл дампа
      *
      * @param \BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface $connection
+     * @param bool $backslashEscapes
      */
-    private function importDumpFile(string $filePath, int $current, int $total, $connection): void
+    private function importDumpFile(string $filePath, int $current, int $total, $connection, $backslashEscapes = false): void
     {
         // Извлечение schema из пути: database/dumps/{schema}/{table}.sql
         $pathParts = explode(DIRECTORY_SEPARATOR, $filePath);
@@ -280,7 +285,7 @@ class DatabaseImporter
 
         try {
             $sql = $this->fileSystem->read($filePath);
-            $statements = $this->parser->parseFile($sql);
+            $statements = $this->parser->parseFile($sql, $backslashEscapes);
 
             foreach ($statements as $statement) {
                 if (!empty(trim($statement))) {

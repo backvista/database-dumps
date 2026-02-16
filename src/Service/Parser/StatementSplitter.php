@@ -10,9 +10,12 @@ class StatementSplitter
     /**
      * Разбить SQL на отдельные команды
      *
+     * @param string $sql
+     * @param bool $backslashEscapes Включить MySQL-style backslash-экранирование (\' и \\).
+     *                               Для PostgreSQL и Oracle должно быть false (backslash — литеральный символ).
      * @return array<string>
      */
-    public function split(string $sql): array
+    public function split(string $sql, $backslashEscapes = false): array
     {
         $statements = [];
         $current = '';
@@ -43,8 +46,8 @@ class StatementSplitter
                 while ($i < $len) {
                     $c = $sql[$i];
                     $current .= $c;
-                    if ($c === '\\' && $i + 1 < $len) {
-                        // Backslash-escape (MySQL style)
+                    if ($backslashEscapes && $c === '\\' && $i + 1 < $len) {
+                        // Backslash-escape (MySQL style): \' и \\
                         $i++;
                         $current .= $sql[$i];
                         $i++;
