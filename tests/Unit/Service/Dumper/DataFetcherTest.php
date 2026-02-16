@@ -7,7 +7,9 @@ use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
 use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\MySqlPlatform;
 use BackVista\DatabaseDumps\Platform\OraclePlatform;
+use BackVista\DatabaseDumps\Platform\PlatformFactory;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
 use BackVista\DatabaseDumps\Service\Dumper\DataFetcher;
@@ -207,6 +209,135 @@ class DataFetcherTest extends TestCase
             ->willReturn([]);
 
         $fetcher->fetch($config);
+    }
+
+    public function testFetchNormalizesBooleanColumnsForPostgres(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
+
+        $connection->method('fetchAllAssociative')->willReturnCallback(
+            function ($sql) {
+                if (strpos($sql, 'information_schema') !== false) {
+                    return [
+                        ['column_name' => 'is_active'],
+                        ['column_name' => 'is_deleted'],
+                    ];
+                }
+                // PostgreSQL PDO (PHP < 8.1) возвращает boolean как строки 't'/'f'
+                return [
+                    ['id' => 1, 'name' => 'User 1', 'is_active' => 't', 'is_deleted' => 'f'],
+                    ['id' => 2, 'name' => 'User 2', 'is_active' => 'f', 'is_deleted' => 't'],
+                ];
+            }
+        );
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, new DumpConfig([], []));
+
+        $config = new TableConfig('users', 'users');
+        $rows = $fetcher->fetch($config);
+
+        $this->assertCount(2, $rows);
+        $this->assertTrue($rows[0]['is_active']);
+        $this->assertFalse($rows[0]['is_deleted']);
+        $this->assertFalse($rows[1]['is_active']);
+        $this->assertTrue($rows[1]['is_deleted']);
+        // Нe-boolean колонки не затронуты
+        $this->assertSame('User 1', $rows[0]['name']);
+    }
+
+    public function testFetchNormalizesNativeBooleanForPostgres(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
+
+        $connection->method('fetchAllAssociative')->willReturnCallback(
+            function ($sql) {
+                if (strpos($sql, 'information_schema') !== false) {
+                    return [['column_name' => 'is_active']];
+                }
+                // PHP >= 8.1 PDO возвращает нативные boolean
+                return [
+                    ['id' => 1, 'is_active' => true],
+                    ['id' => 2, 'is_active' => false],
+                ];
+            }
+        );
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, new DumpConfig([], []));
+
+        $rows = $fetcher->fetch(new TableConfig('users', 'users'));
+
+        $this->assertTrue($rows[0]['is_active']);
+        $this->assertFalse($rows[1]['is_active']);
+    }
+
+    public function testFetchPreservesNullBooleanForPostgres(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::POSTGRESQL);
+
+        $connection->method('fetchAllAssociative')->willReturnCallback(
+            function ($sql) {
+                if (strpos($sql, 'information_schema') !== false) {
+                    return [['column_name' => 'is_active']];
+                }
+                return [['id' => 1, 'is_active' => null]];
+            }
+        );
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, new DumpConfig([], []));
+
+        $rows = $fetcher->fetch(new TableConfig('users', 'users'));
+
+        $this->assertNull($rows[0]['is_active']);
+    }
+
+    public function testFetchDoesNotNormalizeBooleanForMysql(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::MYSQL);
+
+        // fetchAllAssociative вызывается только один раз (без information_schema)
+        $connection->expects($this->once())
+            ->method('fetchAllAssociative')
+            ->willReturn([
+                ['id' => 1, 'is_active' => 1],
+            ]);
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn(new MySqlPlatform());
+
+        $cascadeResolver = $this->createMock(CascadeWhereResolver::class);
+        $cascadeResolver->method('resolve')->willReturn(null);
+
+        $fetcher = new DataFetcher($registry, $cascadeResolver, new DumpConfig([], []));
+
+        $rows = $fetcher->fetch(new TableConfig('users', 'users'));
+
+        $this->assertSame(1, $rows[0]['is_active']);
     }
 
     public function testFetchWithCascadeFromReturningNull(): void
