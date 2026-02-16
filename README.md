@@ -90,7 +90,7 @@ PHP-пакет для экспорта и импорта дампов баз д�
 ## Установка
 
 ```bash
-composer require backvista/database-dumps
+composer require --dev backvista/database-dumps
 ```
 
 ## Быстрый старт
@@ -847,7 +847,7 @@ PHP package for exporting and importing database dumps as SQL. Supports PostgreS
 ## Installation
 
 ```bash
-composer require backvista/database-dumps
+composer require --dev backvista/database-dumps
 ```
 
 <a id="quick-start"></a>
