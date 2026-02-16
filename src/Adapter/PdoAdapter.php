@@ -38,6 +38,10 @@ class PdoAdapter implements DatabaseConnectionInterface
         }
         $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
+        if ($this->driverName === 'pgsql' && !empty($rows)) {
+            $rows = BooleanNormalizer::normalize($stmt, $rows);
+        }
+
         if ($this->driverName === 'oci') {
             return array_map(function (array $row) {
                 $normalized = array_change_key_case($row, CASE_LOWER);

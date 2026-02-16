@@ -124,6 +124,50 @@ class PdoAdapterTest extends TestCase
         $this->assertIsString($rows[0]['data']);
     }
 
+    public function testFetchAllAssociativeNormalizesPostgresBooleans(): void
+    {
+        $stmt = $this->createMock(\PDOStatement::class);
+        $stmt->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn([
+            ['id' => 1, 'is_active' => 't', 'is_deleted' => 'f'],
+        ]);
+        $stmt->method('columnCount')->willReturn(3);
+        $stmt->method('getColumnMeta')->willReturnCallback(function ($i) {
+            $columns = [
+                ['name' => 'id', 'native_type' => 'int4'],
+                ['name' => 'is_active', 'native_type' => 'bool'],
+                ['name' => 'is_deleted', 'native_type' => 'bool'],
+            ];
+            return isset($columns[$i]) ? $columns[$i] : false;
+        });
+
+        $pdo = $this->createPdoMock('pgsql');
+        $pdo->method('query')->willReturn($stmt);
+
+        $adapter = new PdoAdapter($pdo);
+        $rows = $adapter->fetchAllAssociative('SELECT * FROM users');
+
+        $this->assertTrue($rows[0]['is_active']);
+        $this->assertFalse($rows[0]['is_deleted']);
+        $this->assertSame(1, $rows[0]['id']);
+    }
+
+    public function testFetchAllAssociativeDoesNotNormalizeMysqlBooleans(): void
+    {
+        $stmt = $this->createMock(\PDOStatement::class);
+        $stmt->method('fetchAll')->with(\PDO::FETCH_ASSOC)->willReturn([
+            ['id' => 1, 'is_active' => 1],
+        ]);
+
+        $pdo = $this->createPdoMock('mysql');
+        $pdo->method('query')->willReturn($stmt);
+
+        $adapter = new PdoAdapter($pdo);
+        $rows = $adapter->fetchAllAssociative('SELECT * FROM users');
+
+        // MySQL: значение не нормализуется, остаётся integer
+        $this->assertSame(1, $rows[0]['is_active']);
+    }
+
     public function testFetchFirstColumn(): void
     {
         $stmt = $this->createMock(\PDOStatement::class);

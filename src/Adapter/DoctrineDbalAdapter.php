@@ -29,6 +29,13 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
      */
     public function fetchAllAssociative(string $sql): array
     {
+        if ($this->isPostgres()) {
+            $pdo = $this->getNativePdo();
+            if ($pdo !== null) {
+                return $this->fetchViaPdoWithBooleans($pdo, $sql);
+            }
+        }
+
         return $this->connection->fetchAllAssociative($sql);
     }
 
@@ -64,6 +71,57 @@ class DoctrineDbalAdapter implements DatabaseConnectionInterface
     public function isTransactionActive(): bool
     {
         return $this->connection->isTransactionActive();
+    }
+
+    /**
+     * @return bool
+     */
+    private function isPostgres()
+    {
+        $platform = $this->connection->getDatabasePlatform();
+        $className = get_class($platform);
+
+        return strpos($className, 'PostgreSQL') !== false || strpos($className, 'Postgre') !== false;
+    }
+
+    /**
+     * Выполнить запрос через нативный PDO с нормализацией boolean-колонок
+     *
+     * @param \PDO $pdo
+     * @param string $sql
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchViaPdoWithBooleans(\PDO $pdo, $sql)
+    {
+        $stmt = $pdo->query($sql);
+        if ($stmt === false) {
+            return array();
+        }
+
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        if (empty($rows)) {
+            return $rows;
+        }
+
+        return BooleanNormalizer::normalize($stmt, $rows);
+    }
+
+    /**
+     * @return \PDO|null
+     */
+    private function getNativePdo()
+    {
+        if (method_exists($this->connection, 'getNativeConnection')) {
+            $native = $this->connection->getNativeConnection();
+            return $native instanceof \PDO ? $native : null;
+        }
+
+        if (method_exists($this->connection, 'getWrappedConnection')) {
+            $wrapped = $this->connection->getWrappedConnection();
+            return $wrapped instanceof \PDO ? $wrapped : null;
+        }
+
+        return null;
     }
 
     public function getPlatformName(): string

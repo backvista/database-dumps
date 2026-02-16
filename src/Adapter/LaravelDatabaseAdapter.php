@@ -29,11 +29,34 @@ class LaravelDatabaseAdapter implements DatabaseConnectionInterface
      */
     public function fetchAllAssociative(string $sql): array
     {
+        if ($this->connection->getDriverName() === PlatformFactory::PGSQL) {
+            return $this->fetchViaPdoWithBooleans($sql);
+        }
+
         $results = $this->connection->select($sql);
 
         return array_map(function ($row) {
             return (array) $row;
         }, $results);
+    }
+
+    /**
+     * @param string $sql
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchViaPdoWithBooleans($sql)
+    {
+        $stmt = $this->connection->getPdo()->query($sql);
+        if ($stmt === false) {
+            return array();
+        }
+
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        if (empty($rows)) {
+            return $rows;
+        }
+
+        return BooleanNormalizer::normalize($stmt, $rows);
     }
 
     /**
