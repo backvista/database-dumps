@@ -88,6 +88,8 @@ class InsertGenerator
             foreach ($row as $value) {
                 if ($value === null) {
                     $escapedValues[] = 'NULL';
+                } elseif (is_bool($value)) {
+                    $escapedValues[] = $value ? 'TRUE' : 'FALSE';
                 } else {
                     $escapedValues[] = $connection->quote($value);
                 }
@@ -123,6 +125,8 @@ class InsertGenerator
             foreach ($row as $value) {
                 if ($value === null) {
                     $escapedValues[] = 'NULL';
+                } elseif (is_bool($value)) {
+                    $escapedValues[] = $value ? 'TRUE' : 'FALSE';
                 } else {
                     $escapedValues[] = $connection->quote($value);
                 }

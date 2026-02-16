@@ -144,6 +144,51 @@ class InsertGeneratorTest extends TestCase
         $this->assertStringNotContainsString("),\n(", $sql);
     }
 
+    public function testGenerateHandlesBooleanValues(): void
+    {
+        $rows = [
+            ['id' => 1, 'name' => 'User 1', 'is_active' => true, 'is_deleted' => false]
+        ];
+
+        $sql = $this->generator->generate('users', 'users', $rows);
+
+        $this->assertStringContainsString('TRUE', $sql);
+        $this->assertStringContainsString('FALSE', $sql);
+        // Boolean не должны быть в кавычках
+        $this->assertStringNotContainsString("'TRUE'", $sql);
+        $this->assertStringNotContainsString("'FALSE'", $sql);
+        $this->assertStringNotContainsString("''", $sql);
+    }
+
+    public function testGenerateOracleHandlesBooleanValues(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('quote')->willReturnCallback(function ($value) {
+            return "'{$value}'";
+        });
+        $connection->method('getPlatformName')->willReturn(PlatformFactory::ORACLE);
+
+        $platform = new OraclePlatform();
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getConnection')->willReturn($connection);
+        $registry->method('getPlatform')->willReturn($platform);
+
+        $generator = new InsertGenerator($registry);
+
+        $rows = [
+            ['id' => 1, 'is_active' => true, 'is_deleted' => false],
+        ];
+
+        $sql = $generator->generate('users', 'users', $rows);
+
+        $this->assertStringContainsString('TRUE', $sql);
+        $this->assertStringContainsString('FALSE', $sql);
+        $this->assertStringNotContainsString("'TRUE'", $sql);
+        $this->assertStringNotContainsString("'FALSE'", $sql);
+        $this->assertStringNotContainsString("''", $sql);
+    }
+
     public function testGenerateOracleHandlesNullValues(): void
     {
         $connection = $this->createMock(DatabaseConnectionInterface::class);
