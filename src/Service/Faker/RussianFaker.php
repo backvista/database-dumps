@@ -202,9 +202,16 @@ class RussianFaker implements FakerInterface
         'ъ' => '', 'ы' => 'y', 'ь' => '', 'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
     ];
 
+    /** @var array<string> Паттерны-якоря, содержащие составное ФИО (определяют «человека» в группе) */
+    private const ANCHOR_PATTERNS = [
+        PatternDetector::PATTERN_FIO,
+        PatternDetector::PATTERN_NAME,
+    ];
+
     /**
      * Заменяет ПД в строках данных согласно fakerConfig.
-     * Seed: если есть колонка с паттерном fio — хеш от неё, иначе хеш от всех faker-значений строки.
+     * Колонки группируются по общему префиксу с якорем (fio/name).
+     * Seed каждой группы: хеш от значения якоря, или от всех faker-значений группы.
      *
      * @inheritDoc
      */
@@ -214,77 +221,190 @@ class RussianFaker implements FakerInterface
             return $rows;
         }
 
-        // Находим колонку с паттерном fio (ФИО из 3 слов) для приоритетного сидирования
-        $fioColumn = null;
+        $groups = $this->buildColumnGroups($fakerConfig);
+
+        foreach ($rows as &$row) {
+            foreach ($groups as $group) {
+                $this->applyGroup($group, $row);
+            }
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    /**
+     * Сгруппировать колонки fakerConfig по общему префиксу с якорями (fio/name).
+     *
+     * Якорь — колонка с паттерном fio или name.
+     * Остальные колонки привязываются к якорю, если имеют общий префикс (>0 символов).
+     * Колонки без якоря и без общего префикса попадают в одну группу без якоря.
+     *
+     * @param array<string, string> $fakerConfig column => patternType
+     * @return array<array{anchor: string|null, columns: array<string, string>}>
+     */
+    private function buildColumnGroups(array $fakerConfig): array
+    {
+        // Разделить на якоря и остальные
+        /** @var array<string, string> $anchors column => patternType */
+        $anchors = [];
+        /** @var array<string, string> $others column => patternType */
+        $others = [];
+
         foreach ($fakerConfig as $column => $patternType) {
+            if (in_array($patternType, self::ANCHOR_PATTERNS, true)) {
+                $anchors[$column] = $patternType;
+            } else {
+                $others[$column] = $patternType;
+            }
+        }
+
+        // При <= 1 якоре — одна группа (BC-safe)
+        if (count($anchors) <= 1) {
+            $anchorColumn = !empty($anchors) ? key($anchors) : null;
+            return [
+                ['anchor' => $anchorColumn, 'columns' => $fakerConfig],
+            ];
+        }
+
+        // Несколько якорей — группируем по commonPrefix
+        /** @var array<string, array{anchor: string, columns: array<string, string>}> $groups */
+        $groups = [];
+        foreach ($anchors as $anchorCol => $anchorPattern) {
+            $groups[$anchorCol] = [
+                'anchor' => $anchorCol,
+                'columns' => [$anchorCol => $anchorPattern],
+            ];
+        }
+
+        // Привязать остальные колонки к якорю с наибольшим общим префиксом
+        /** @var array<string, string> $ungrouped */
+        $ungrouped = [];
+        foreach ($others as $column => $patternType) {
+            $bestAnchor = null;
+            $bestPrefixLen = 0;
+
+            foreach ($anchors as $anchorCol => $anchorPattern) {
+                $prefix = $this->commonPrefix($column, $anchorCol);
+                $prefixLen = strlen($prefix);
+                if ($prefixLen > $bestPrefixLen) {
+                    $bestPrefixLen = $prefixLen;
+                    $bestAnchor = $anchorCol;
+                }
+            }
+
+            if ($bestAnchor !== null && $bestPrefixLen > 0) {
+                $groups[$bestAnchor]['columns'][$column] = $patternType;
+            } else {
+                $ungrouped[$column] = $patternType;
+            }
+        }
+
+        $result = array_values($groups);
+
+        // Негруппированные колонки — в отдельную группу без якоря
+        if (!empty($ungrouped)) {
+            $result[] = ['anchor' => null, 'columns' => $ungrouped];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Наибольший общий префикс двух строк.
+     *
+     * @return string
+     */
+    private function commonPrefix(string $a, string $b): string
+    {
+        $minLen = min(strlen($a), strlen($b));
+        $prefix = '';
+        for ($i = 0; $i < $minLen; $i++) {
+            if ($a[$i] !== $b[$i]) {
+                break;
+            }
+            $prefix .= $a[$i];
+        }
+        return $prefix;
+    }
+
+    /**
+     * Применить faker к одной группе колонок в строке.
+     *
+     * @param array{anchor: string|null, columns: array<string, string>} $group
+     * @param array<string, mixed> &$row
+     */
+    private function applyGroup(array $group, array &$row): void
+    {
+        $anchorColumn = $group['anchor'];
+        $columns = $group['columns'];
+
+        // Найти fio-колонку внутри группы для приоритетного сидирования
+        $fioColumn = null;
+        foreach ($columns as $column => $patternType) {
             if ($patternType === PatternDetector::PATTERN_FIO) {
                 $fioColumn = $column;
                 break;
             }
         }
 
-        foreach ($rows as &$row) {
-            // Seed: приоритет — ФИО (3 слова), иначе хеш всех faker-значений
-            if ($fioColumn !== null && isset($row[$fioColumn])) {
-                mt_srand(crc32((string) $row[$fioColumn]));
-            } else {
-                $seedParts = [];
-                foreach ($fakerConfig as $column => $patternType) {
-                    $seedParts[] = isset($row[$column]) ? (string) $row[$column] : '';
-                }
-                mt_srand(crc32(implode("\0", $seedParts)));
+        // Seed: приоритет — ФИО (3 слова), иначе хеш всех faker-значений группы
+        if ($fioColumn !== null && isset($row[$fioColumn])) {
+            mt_srand(crc32((string) $row[$fioColumn]));
+        } else {
+            $seedParts = [];
+            foreach ($columns as $column => $patternType) {
+                $seedParts[] = isset($row[$column]) ? (string) $row[$column] : '';
+            }
+            mt_srand(crc32(implode("\0", $seedParts)));
+        }
+
+        // Один «человек» на группу
+        $gender = mt_rand(0, 1); // 0=male, 1=female
+
+        $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
+        $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
+        $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
+
+        $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
+        $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
+        $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
+
+        foreach ($columns as $column => $patternType) {
+            if (!isset($row[$column])) {
+                continue;
             }
 
-            // Один «человек» на строку
-            $gender = mt_rand(0, 1); // 0=male, 1=female
-
-            $lastNameList = $gender ? self::LAST_NAMES_FEMALE : self::LAST_NAMES_MALE;
-            $firstNameList = $gender ? self::FIRST_NAMES_FEMALE : self::FIRST_NAMES_MALE;
-            $patronymicList = $gender ? self::PATRONYMICS_FEMALE : self::PATRONYMICS_MALE;
-
-            $lastName = $lastNameList[mt_rand(0, count($lastNameList) - 1)];
-            $firstName = $firstNameList[mt_rand(0, count($firstNameList) - 1)];
-            $patronymic = $patronymicList[mt_rand(0, count($patronymicList) - 1)];
-
-            foreach ($fakerConfig as $column => $patternType) {
-                if (!isset($row[$column])) {
-                    continue;
-                }
-
-                switch ($patternType) {
-                    case PatternDetector::PATTERN_FIO:
-                        $row[$column] = $lastName . ' ' . $firstName . ' ' . $patronymic;
-                        break;
-                    case PatternDetector::PATTERN_FIO_SHORT:
-                        $row[$column] = $lastName . ' ' . mb_substr($firstName, 0, 1) . '.' . mb_substr($patronymic, 0, 1) . '.';
-                        break;
-                    case PatternDetector::PATTERN_NAME:
-                        $row[$column] = $lastName . ' ' . $firstName;
-                        break;
-                    case PatternDetector::PATTERN_EMAIL:
-                        $row[$column] = $this->generateEmail($firstName, $lastName);
-                        break;
-                    case PatternDetector::PATTERN_PHONE:
-                        $row[$column] = $this->generatePhone((string) $row[$column]);
-                        break;
-                    case PatternDetector::PATTERN_FIRSTNAME:
-                        $row[$column] = $firstName;
-                        break;
-                    case PatternDetector::PATTERN_LASTNAME:
-                        $row[$column] = $lastName;
-                        break;
-                    case PatternDetector::PATTERN_PATRONYMIC:
-                        $row[$column] = $patronymic;
-                        break;
-                    case PatternDetector::PATTERN_GENDER:
-                        $row[$column] = $this->generateGender($gender, (string) $row[$column]);
-                        break;
-                }
+            switch ($patternType) {
+                case PatternDetector::PATTERN_FIO:
+                    $row[$column] = $lastName . ' ' . $firstName . ' ' . $patronymic;
+                    break;
+                case PatternDetector::PATTERN_FIO_SHORT:
+                    $row[$column] = $lastName . ' ' . mb_substr($firstName, 0, 1) . '.' . mb_substr($patronymic, 0, 1) . '.';
+                    break;
+                case PatternDetector::PATTERN_NAME:
+                    $row[$column] = $lastName . ' ' . $firstName;
+                    break;
+                case PatternDetector::PATTERN_EMAIL:
+                    $row[$column] = $this->generateEmail($firstName, $lastName);
+                    break;
+                case PatternDetector::PATTERN_PHONE:
+                    $row[$column] = $this->generatePhone((string) $row[$column]);
+                    break;
+                case PatternDetector::PATTERN_FIRSTNAME:
+                    $row[$column] = $firstName;
+                    break;
+                case PatternDetector::PATTERN_LASTNAME:
+                    $row[$column] = $lastName;
+                    break;
+                case PatternDetector::PATTERN_PATRONYMIC:
+                    $row[$column] = $patronymic;
+                    break;
+                case PatternDetector::PATTERN_GENDER:
+                    $row[$column] = $this->generateGender($gender, (string) $row[$column]);
+                    break;
             }
         }
-        unset($row);
-
-        return $rows;
     }
 
     /** Генерирует email из транслитерированных имени и фамилии. */

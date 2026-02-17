@@ -13,6 +13,9 @@ class CascadeWhereResolver
     /** @var ConnectionRegistryInterface */
     private $registry;
 
+    /** @var int Счётчик подзапросов для уникальных алиасов */
+    private $subqueryCounter = 0;
+
     public function __construct(ConnectionRegistryInterface $registry)
     {
         $this->registry = $registry;
@@ -29,6 +32,8 @@ class CascadeWhereResolver
         if ($cascadeFrom === null || empty($cascadeFrom)) {
             return null;
         }
+
+        $this->subqueryCounter = 0;
 
         $conditions = [];
         foreach ($cascadeFrom as $entry) {
@@ -124,6 +129,19 @@ class CascadeWhereResolver
             $whereClause .= ' ' . $platform->getLimitSql((int) $limit);
         }
 
-        return "{$fkColumn} IN ({$subquery}{$whereClause})";
+        $innerSql = $subquery . $whereClause;
+
+        // MySQL/MariaDB не поддерживает LIMIT в подзапросе внутри IN —
+        // оборачиваем в дополнительный SELECT
+        if ($limit !== null) {
+            $platformName = $this->registry->getConnection($connectionName)->getPlatformName();
+            if ($platformName === 'mysql' || $platformName === 'mariadb') {
+                $alias = '_cascade_' . $this->subqueryCounter;
+                $this->subqueryCounter++;
+                $innerSql = "SELECT * FROM ({$innerSql}) AS {$alias}";
+            }
+        }
+
+        return "{$fkColumn} IN ({$innerSql})";
     }
 }

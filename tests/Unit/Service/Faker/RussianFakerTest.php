@@ -423,6 +423,104 @@ class RussianFakerTest extends TestCase
         $this->assertEquals('1', $result[0]['gender']);
     }
 
+    public function testSellerBuyerDifferentPeople(): void
+    {
+        $fakerConfig = [
+            'seller_fio' => PatternDetector::PATTERN_FIO,
+            'seller_fio_short' => PatternDetector::PATTERN_FIO_SHORT,
+            'seller_email' => PatternDetector::PATTERN_EMAIL,
+            'buyer_fio' => PatternDetector::PATTERN_FIO,
+            'buyer_fio_short' => PatternDetector::PATTERN_FIO_SHORT,
+            'buyer_email' => PatternDetector::PATTERN_EMAIL,
+        ];
+        $rows = [
+            [
+                'id' => 1,
+                'seller_fio' => 'Продавцов Продавец Продавцович',
+                'seller_fio_short' => 'Продавцов П.П.',
+                'seller_email' => 'seller@example.com',
+                'buyer_fio' => 'Покупателев Покупатель Покупателевич',
+                'buyer_fio_short' => 'Покупателев П.П.',
+                'buyer_email' => 'buyer@example.com',
+            ],
+        ];
+        $result = $this->faker->apply('public', 'deals', $fakerConfig, $rows);
+
+        // seller и buyer — РАЗНЫЕ люди
+        $this->assertNotEquals($result[0]['seller_fio'], $result[0]['buyer_fio']);
+
+        // seller_fio и seller_fio_short согласованы
+        $sellerParts = explode(' ', $result[0]['seller_fio']);
+        $expectedSellerShort = $sellerParts[0] . ' ' . mb_substr($sellerParts[1], 0, 1) . '.' . mb_substr($sellerParts[2], 0, 1) . '.';
+        $this->assertEquals($expectedSellerShort, $result[0]['seller_fio_short']);
+
+        // buyer_fio и buyer_fio_short согласованы
+        $buyerParts = explode(' ', $result[0]['buyer_fio']);
+        $expectedBuyerShort = $buyerParts[0] . ' ' . mb_substr($buyerParts[1], 0, 1) . '.' . mb_substr($buyerParts[2], 0, 1) . '.';
+        $this->assertEquals($expectedBuyerShort, $result[0]['buyer_fio_short']);
+    }
+
+    public function testSellerBuyerEmailsCorrespondToOwnGroup(): void
+    {
+        $translitMap = [
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'yo',
+            'ж' => 'zh', 'з' => 'z', 'и' => 'i', 'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm',
+            'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't', 'у' => 'u',
+            'ф' => 'f', 'х' => 'kh', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'shch',
+            'ъ' => '', 'ы' => 'y', 'ь' => '', 'э' => 'e', 'ю' => 'yu', 'я' => 'ya',
+        ];
+
+        $fakerConfig = [
+            'seller_fio' => PatternDetector::PATTERN_FIO,
+            'seller_email' => PatternDetector::PATTERN_EMAIL,
+            'buyer_fio' => PatternDetector::PATTERN_FIO,
+            'buyer_email' => PatternDetector::PATTERN_EMAIL,
+        ];
+        $rows = [
+            [
+                'id' => 1,
+                'seller_fio' => 'Продавцов Продавец Продавцович',
+                'seller_email' => 'seller@example.com',
+                'buyer_fio' => 'Покупателев Покупатель Покупателевич',
+                'buyer_email' => 'buyer@example.com',
+            ],
+        ];
+        $result = $this->faker->apply('public', 'deals', $fakerConfig, $rows);
+
+        // seller_email соответствует seller_fio
+        $sellerParts = explode(' ', $result[0]['seller_fio']);
+        $sellerTranslitFirst = strtr(mb_strtolower($sellerParts[1]), $translitMap);
+        $sellerTranslitLast = strtr(mb_strtolower($sellerParts[0]), $translitMap);
+        $sellerEmailLocal = explode('@', $result[0]['seller_email'])[0];
+        $this->assertStringStartsWith($sellerTranslitFirst . '.' . $sellerTranslitLast, $sellerEmailLocal);
+
+        // buyer_email соответствует buyer_fio
+        $buyerParts = explode(' ', $result[0]['buyer_fio']);
+        $buyerTranslitFirst = strtr(mb_strtolower($buyerParts[1]), $translitMap);
+        $buyerTranslitLast = strtr(mb_strtolower($buyerParts[0]), $translitMap);
+        $buyerEmailLocal = explode('@', $result[0]['buyer_email'])[0];
+        $this->assertStringStartsWith($buyerTranslitFirst . '.' . $buyerTranslitLast, $buyerEmailLocal);
+    }
+
+    public function testSingleAnchorBackwardCompatible(): void
+    {
+        // С одним якорем поведение идентично старому
+        $fakerConfig = [
+            'full_name' => PatternDetector::PATTERN_FIO,
+            'short_name' => PatternDetector::PATTERN_FIO_SHORT,
+            'email' => PatternDetector::PATTERN_EMAIL,
+        ];
+        $rows = [
+            ['id' => 1, 'full_name' => 'Тестов Тест Тестович', 'short_name' => 'Тестов Т.Т.', 'email' => 'test@example.com'],
+        ];
+        $result = $this->faker->apply('public', 'users', $fakerConfig, $rows);
+
+        // Все колонки согласованы (один человек)
+        $fioParts = explode(' ', $result[0]['full_name']);
+        $expectedShort = $fioParts[0] . ' ' . mb_substr($fioParts[1], 0, 1) . '.' . mb_substr($fioParts[2], 0, 1) . '.';
+        $this->assertEquals($expectedShort, $result[0]['short_name']);
+    }
+
     public function testFioWithAllLinkedComponents(): void
     {
         $fakerConfig = [

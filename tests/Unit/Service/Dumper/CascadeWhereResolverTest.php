@@ -5,6 +5,8 @@ namespace BackVista\DatabaseDumps\Tests\Unit\Service\Dumper;
 use BackVista\DatabaseDumps\Config\DumpConfig;
 use BackVista\DatabaseDumps\Config\TableConfig;
 use BackVista\DatabaseDumps\Contract\ConnectionRegistryInterface;
+use BackVista\DatabaseDumps\Contract\DatabaseConnectionInterface;
+use BackVista\DatabaseDumps\Platform\MySqlPlatform;
 use BackVista\DatabaseDumps\Platform\OraclePlatform;
 use BackVista\DatabaseDumps\Platform\PostgresPlatform;
 use BackVista\DatabaseDumps\Service\Dumper\CascadeWhereResolver;
@@ -17,8 +19,12 @@ class CascadeWhereResolverTest extends TestCase
 
     protected function setUp(): void
     {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn('postgresql');
+
         $registry = $this->createMock(ConnectionRegistryInterface::class);
         $registry->method('getPlatform')->willReturn(new PostgresPlatform());
+        $registry->method('getConnection')->willReturn($connection);
         $this->resolver = new CascadeWhereResolver($registry);
     }
 
@@ -123,8 +129,12 @@ class CascadeWhereResolverTest extends TestCase
 
     public function testResolveUsesOracleLimitSyntax(): void
     {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn('oracle');
+
         $registry = $this->createMock(ConnectionRegistryInterface::class);
         $registry->method('getPlatform')->willReturn(new OraclePlatform());
+        $registry->method('getConnection')->willReturn($connection);
         $resolver = new CascadeWhereResolver($registry);
 
         $config = new TableConfig('public', 'orders', 500, null, 'id DESC', null, [
@@ -143,5 +153,112 @@ class CascadeWhereResolverTest extends TestCase
         $this->assertNotNull($result);
         $this->assertStringContainsString('FETCH FIRST 100 ROWS ONLY', $result);
         $this->assertStringNotContainsString('LIMIT', $result);
+    }
+
+    public function testMysqlWrapsSubqueryWithLimitInDerivedTable(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn('mysql');
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getPlatform')->willReturn(new MySqlPlatform());
+        $registry->method('getConnection')->willReturn($connection);
+        $resolver = new CascadeWhereResolver($registry);
+
+        $config = new TableConfig('public', 'orders', 500, null, null, null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [
+                    TableConfig::KEY_LIMIT => 100,
+                    TableConfig::KEY_ORDER_BY => 'created_at DESC',
+                    TableConfig::KEY_WHERE => 'is_active = 1',
+                ],
+            ]]
+        );
+        $result = $resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+        // Подзапрос обёрнут: SELECT * FROM (...) AS _cascade_0
+        $this->assertStringContainsString('SELECT * FROM (SELECT `id` FROM `public`.`users`', $result);
+        $this->assertStringContainsString('AS _cascade_0', $result);
+        $this->assertStringContainsString('LIMIT 100', $result);
+    }
+
+    public function testMysqlUniqueAliasesForMultipleCascades(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn('mysql');
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getPlatform')->willReturn(new MySqlPlatform());
+        $registry->method('getConnection')->willReturn($connection);
+        $resolver = new CascadeWhereResolver($registry);
+
+        $config = new TableConfig('public', 'order_items', 500, null, null, null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+            ['parent' => 'public.orders', 'fk_column' => 'order_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [TableConfig::KEY_LIMIT => 100],
+                'orders' => [TableConfig::KEY_LIMIT => 200],
+            ]]
+        );
+        $result = $resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+        $this->assertStringContainsString('_cascade_0', $result);
+        $this->assertStringContainsString('_cascade_1', $result);
+    }
+
+    public function testMysqlNoWrapWithoutLimit(): void
+    {
+        $connection = $this->createMock(DatabaseConnectionInterface::class);
+        $connection->method('getPlatformName')->willReturn('mysql');
+
+        $registry = $this->createMock(ConnectionRegistryInterface::class);
+        $registry->method('getPlatform')->willReturn(new MySqlPlatform());
+        $registry->method('getConnection')->willReturn($connection);
+        $resolver = new CascadeWhereResolver($registry);
+
+        $config = new TableConfig('public', 'orders', 500, null, null, null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [
+                    TableConfig::KEY_WHERE => 'is_active = 1',
+                ],
+            ]]
+        );
+        $result = $resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+        // Без LIMIT не оборачивается
+        $this->assertStringNotContainsString('_cascade_', $result);
+        $this->assertStringNotContainsString('SELECT * FROM', $result);
+    }
+
+    public function testPostgresNoWrapWithLimit(): void
+    {
+        $config = new TableConfig('public', 'orders', 500, null, null, null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [
+                    TableConfig::KEY_LIMIT => 100,
+                ],
+            ]]
+        );
+        $result = $this->resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+        // PG не оборачивает
+        $this->assertStringNotContainsString('_cascade_', $result);
+        $this->assertStringNotContainsString('SELECT * FROM', $result);
+        $this->assertStringContainsString('LIMIT 100', $result);
     }
 }

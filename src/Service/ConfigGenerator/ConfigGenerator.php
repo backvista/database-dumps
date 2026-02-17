@@ -308,21 +308,33 @@ class ConfigGenerator
 
         // Обогащение cascade_from из FK графа
         if ($this->cascadeEnabled) {
+            $this->logger->info('Построение графа FK зависимостей...');
             $graph = $this->dependencyResolver->getDependencyGraph($connectionName);
             $this->addCascadeFromConfig($partialExport, $fullExport, $graph, $connectionName);
         }
 
         // Детекция паттернов faker
         if ($this->fakerEnabled) {
+            $fakerTotal = count($nonEmptyTables);
+            $fakerCurrent = 0;
             foreach ($nonEmptyTables as $tableInfo) {
+                $fakerCurrent++;
                 $schema = $tableInfo['schema'];
                 $table = $tableInfo['table'];
+                $this->logger->info("[{$fakerCurrent}/{$fakerTotal}] Анализ таблицы: {$schema}.{$table}");
                 $patterns = $this->patternDetector->detect($schema, $table, $connectionName);
                 if (!empty($patterns)) {
                     if (!isset($fakerSection[$schema])) {
                         $fakerSection[$schema] = [];
                     }
                     $fakerSection[$schema][$table] = $patterns;
+                    $this->logger->info("  Обнаружены паттерны: " . implode(', ', array_map(
+                        function ($col, $pat) {
+                            return "{$col} => {$pat}";
+                        },
+                        array_keys($patterns),
+                        array_values($patterns)
+                    )));
                 }
             }
         }
