@@ -209,6 +209,33 @@ class DataFetcherTest extends TestCase
         $fetcher->fetch($config);
     }
 
+    public function testGetLastQueryReturnsBuiltSql(): void
+    {
+        $config = new TableConfig(
+            'clients',
+            'clients',
+            100,
+            'is_active = true',
+            'created_at DESC'
+        );
+
+        $this->connection->method('fetchAllAssociative')->willReturn([]);
+
+        $this->fetcher->fetch($config);
+
+        $lastQuery = $this->fetcher->getLastQuery();
+        $this->assertNotNull($lastQuery);
+        $this->assertStringContainsString('SELECT * FROM "clients"."clients"', $lastQuery);
+        $this->assertStringContainsString('WHERE is_active = true', $lastQuery);
+        $this->assertStringContainsString('ORDER BY created_at DESC', $lastQuery);
+        $this->assertStringContainsString('LIMIT 100', $lastQuery);
+    }
+
+    public function testGetLastQueryReturnsNullBeforeFetch(): void
+    {
+        $this->assertNull($this->fetcher->getLastQuery());
+    }
+
     public function testFetchWithCascadeFromReturningNull(): void
     {
         $cascadeFrom = [

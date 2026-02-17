@@ -120,6 +120,38 @@ class SqlGeneratorTest extends TestCase
         $this->assertStringContainsString('Режим: partial (limit 100)', $chunks[0]);
     }
 
+    public function testGenerateIncludesFetchQuery(): void
+    {
+        $config = new TableConfig('users', 'users');
+        $rows = [['id' => 1, 'name' => 'User 1']];
+        $query = 'SELECT * FROM "users"."users"';
+
+        $sql = $this->generator->generate($config, $rows, $query);
+
+        $this->assertStringContainsString('-- Запрос: SELECT * FROM "users"."users"', $sql);
+    }
+
+    public function testGenerateChunksIncludesFetchQuery(): void
+    {
+        $config = new TableConfig('users', 'users');
+        $rows = [['id' => 1, 'name' => 'User 1']];
+        $query = 'SELECT * FROM "users"."users" WHERE is_active = true ORDER BY id LIMIT 500';
+
+        $chunks = iterator_to_array($this->generator->generateChunks($config, $rows, $query));
+
+        $this->assertStringContainsString('-- Запрос: ' . $query, $chunks[0]);
+    }
+
+    public function testGenerateWithoutFetchQuery(): void
+    {
+        $config = new TableConfig('users', 'users');
+        $rows = [['id' => 1, 'name' => 'User 1']];
+
+        $sql = $this->generator->generate($config, $rows);
+
+        $this->assertStringNotContainsString('-- Запрос:', $sql);
+    }
+
     public function testGenerateChunksEmptyRows(): void
     {
         $config = new TableConfig('users', 'users');

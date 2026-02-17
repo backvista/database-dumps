@@ -31,25 +31,16 @@ class SqlGenerator
      *
      * @param TableConfig $config
      * @param array<array<string, mixed>> $rows
+     * @param string|null $fetchQuery SQL-запрос, использованный для выборки данных
      * @return string
      */
-    public function generate(TableConfig $config, array $rows): string
+    public function generate(TableConfig $config, array $rows, ?string $fetchQuery = null): string
     {
         $schema = $config->getSchema();
         $table = $config->getTable();
         $connectionName = $config->getConnectionName();
 
-        $sql = "-- Дамп таблицы: {$schema}.{$table}\n";
-        $sql .= "-- Дата экспорта: " . date('Y-m-d H:i:s') . "\n";
-        $sql .= "-- Количество записей: " . count($rows) . "\n";
-
-        if ($config->isPartialExport()) {
-            $sql .= "-- Режим: partial (limit {$config->getLimit()})\n";
-        } else {
-            $sql .= "-- Режим: full\n";
-        }
-
-        $sql .= "\n";
+        $sql = $this->buildHeader($config, count($rows), $fetchQuery);
 
         // TRUNCATE
         $sql .= $this->truncateGenerator->generate($schema, $table, $connectionName);
@@ -69,25 +60,16 @@ class SqlGenerator
      *
      * @param TableConfig $config
      * @param array<array<string, mixed>> $rows
+     * @param string|null $fetchQuery SQL-запрос, использованный для выборки данных
      * @return \Generator<string>
      */
-    public function generateChunks(TableConfig $config, array $rows)
+    public function generateChunks(TableConfig $config, array $rows, ?string $fetchQuery = null)
     {
         $schema = $config->getSchema();
         $table = $config->getTable();
         $connectionName = $config->getConnectionName();
 
-        $header = "-- Дамп таблицы: {$schema}.{$table}\n";
-        $header .= "-- Дата экспорта: " . date('Y-m-d H:i:s') . "\n";
-        $header .= "-- Количество записей: " . count($rows) . "\n";
-
-        if ($config->isPartialExport()) {
-            $header .= "-- Режим: partial (limit {$config->getLimit()})\n";
-        } else {
-            $header .= "-- Режим: full\n";
-        }
-
-        $header .= "\n";
+        $header = $this->buildHeader($config, count($rows), $fetchQuery);
 
         $header .= $this->truncateGenerator->generate($schema, $table, $connectionName);
         $header .= "\n";
@@ -102,5 +84,37 @@ class SqlGenerator
         if ($footer !== '') {
             yield $footer;
         }
+    }
+
+    /**
+     * Сформировать шапку SQL-дампа
+     *
+     * @param TableConfig $config
+     * @param int $rowCount
+     * @param string|null $fetchQuery
+     * @return string
+     */
+    private function buildHeader(TableConfig $config, int $rowCount, ?string $fetchQuery): string
+    {
+        $schema = $config->getSchema();
+        $table = $config->getTable();
+
+        $header = "-- Дамп таблицы: {$schema}.{$table}\n";
+        $header .= "-- Дата экспорта: " . date('Y-m-d H:i:s') . "\n";
+        $header .= "-- Количество записей: {$rowCount}\n";
+
+        if ($config->isPartialExport()) {
+            $header .= "-- Режим: partial (limit {$config->getLimit()})\n";
+        } else {
+            $header .= "-- Режим: full\n";
+        }
+
+        if ($fetchQuery !== null) {
+            $header .= "-- Запрос: {$fetchQuery}\n";
+        }
+
+        $header .= "\n";
+
+        return $header;
     }
 }

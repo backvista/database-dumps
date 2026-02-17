@@ -20,6 +20,9 @@ class DataFetcher
     /** @var DumpConfig */
     private $dumpConfig;
 
+    /** @var string|null */
+    private $lastQuery;
+
     public function __construct(
         ConnectionRegistryInterface $registry,
         CascadeWhereResolver $cascadeResolver,
@@ -28,6 +31,16 @@ class DataFetcher
         $this->registry = $registry;
         $this->cascadeResolver = $cascadeResolver;
         $this->dumpConfig = $dumpConfig;
+    }
+
+    /**
+     * Получить последний выполненный SQL-запрос
+     *
+     * @return string|null
+     */
+    public function getLastQuery(): ?string
+    {
+        return $this->lastQuery;
     }
 
     /**
@@ -67,6 +80,8 @@ class DataFetcher
         if ($config->getLimit()) {
             $sql .= ' ' . $platform->getLimitSql($config->getLimit());
         }
+
+        $this->lastQuery = $sql;
 
         return $connection->fetchAllAssociative($sql);
     }

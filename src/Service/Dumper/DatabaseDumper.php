@@ -145,8 +145,10 @@ class DatabaseDumper
             $filename = $this->buildDumpPath($config);
             $this->ensureDirectoryExists(dirname($filename));
 
+            $fetchQuery = $this->dataFetcher->getLastQuery();
+
             $first = true;
-            foreach ($this->sqlGenerator->generateChunks($config, $rows) as $chunk) {
+            foreach ($this->sqlGenerator->generateChunks($config, $rows, $fetchQuery) as $chunk) {
                 if ($first) {
                     $this->fileSystem->write($filename, $chunk);
                     $first = false;
