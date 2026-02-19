@@ -28,20 +28,14 @@ class MySqlPlatformTest extends TestCase
         $this->assertEquals('`mydb`.`orders`', $this->platform->getFullTableName('mydb', 'orders'));
     }
 
-    public function testGetTruncateStatementNoCascade(): void
+    public function testGetTruncateStatementUsesDelete(): void
     {
         $sql = $this->platform->getTruncateStatement('users', 'users');
 
+        $this->assertEquals('DELETE FROM `users`.`users`;', $sql);
+        $this->assertStringNotContainsString('TRUNCATE', $sql);
         $this->assertStringNotContainsString('CASCADE', $sql);
-        $this->assertStringContainsString('TRUNCATE TABLE `users`.`users`', $sql);
-    }
-
-    public function testGetTruncateStatementDisablesForeignKeyChecks(): void
-    {
-        $sql = $this->platform->getTruncateStatement('users', 'users');
-
-        $this->assertStringContainsString('SET FOREIGN_KEY_CHECKS=0', $sql);
-        $this->assertStringContainsString('SET FOREIGN_KEY_CHECKS=1', $sql);
+        $this->assertStringNotContainsString('FOREIGN_KEY_CHECKS', $sql);
     }
 
     public function testGetSequenceResetSqlUsesAutoIncrement(): void

@@ -64,7 +64,8 @@ class CascadeWhereResolverTest extends TestCase
         );
         $result = $this->resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
-        $this->assertStringContainsString('user_id IN (SELECT "id" FROM "public"."users"', $result);
+        $this->assertStringContainsString('(user_id IN (SELECT "id" FROM "public"."users"', $result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
         $this->assertStringContainsString('WHERE is_active = true', $result);
         $this->assertStringContainsString('ORDER BY created_at DESC', $result);
         $this->assertStringContainsString('LIMIT 100', $result);
@@ -85,8 +86,10 @@ class CascadeWhereResolverTest extends TestCase
         );
         $result = $this->resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
-        $this->assertStringContainsString('user_id IN (', $result);
-        $this->assertStringContainsString('order_id IN (', $result);
+        $this->assertStringContainsString('(user_id IN (', $result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
+        $this->assertStringContainsString('(order_id IN (', $result);
+        $this->assertStringContainsString('OR order_id IS NULL)', $result);
         $this->assertStringContainsString(' AND ', $result);
     }
 
@@ -123,8 +126,10 @@ class CascadeWhereResolverTest extends TestCase
         $result = $this->resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
         // Should have nested subquery
-        $this->assertStringContainsString('order_id IN (SELECT "id" FROM "public"."orders"', $result);
-        $this->assertStringContainsString('user_id IN (SELECT "id" FROM "public"."users"', $result);
+        $this->assertStringContainsString('(order_id IN (SELECT "id" FROM "public"."orders"', $result);
+        $this->assertStringContainsString('OR order_id IS NULL)', $result);
+        $this->assertStringContainsString('(user_id IN (SELECT "id" FROM "public"."users"', $result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
     }
 
     public function testResolveUsesOracleLimitSyntax(): void
@@ -151,6 +156,8 @@ class CascadeWhereResolverTest extends TestCase
         );
         $result = $resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
+        $this->assertStringContainsString('(user_id IN (', $result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
         $this->assertStringContainsString('FETCH FIRST 100 ROWS ONLY', $result);
         $this->assertStringNotContainsString('LIMIT', $result);
     }
@@ -181,7 +188,8 @@ class CascadeWhereResolverTest extends TestCase
         $result = $resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
         // Подзапрос обёрнут: SELECT * FROM (...) AS _cascade_0
-        $this->assertStringContainsString('SELECT * FROM (SELECT `id` FROM `public`.`users`', $result);
+        $this->assertStringContainsString('(user_id IN (SELECT * FROM (SELECT `id` FROM `public`.`users`', $result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
         $this->assertStringContainsString('AS _cascade_0', $result);
         $this->assertStringContainsString('LIMIT 100', $result);
     }
@@ -209,6 +217,8 @@ class CascadeWhereResolverTest extends TestCase
         );
         $result = $resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
+        $this->assertStringContainsString('OR order_id IS NULL)', $result);
         $this->assertStringContainsString('_cascade_0', $result);
         $this->assertStringContainsString('_cascade_1', $result);
     }
@@ -237,6 +247,7 @@ class CascadeWhereResolverTest extends TestCase
         $result = $resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
         // Без LIMIT не оборачивается
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
         $this->assertStringNotContainsString('_cascade_', $result);
         $this->assertStringNotContainsString('SELECT * FROM', $result);
     }
@@ -257,8 +268,32 @@ class CascadeWhereResolverTest extends TestCase
         $result = $this->resolver->resolve($config, $dumpConfig);
         $this->assertNotNull($result);
         // PG не оборачивает
+        $this->assertStringContainsString('OR user_id IS NULL)', $result);
         $this->assertStringNotContainsString('_cascade_', $result);
         $this->assertStringNotContainsString('SELECT * FROM', $result);
         $this->assertStringContainsString('LIMIT 100', $result);
+    }
+
+    public function testResolveIncludesOrIsNullForNullableFk(): void
+    {
+        $config = new TableConfig('public', 'orders', null, null, null, null, [
+            ['parent' => 'public.users', 'fk_column' => 'user_id', 'parent_column' => 'id'],
+        ]);
+        $dumpConfig = new DumpConfig(
+            [],
+            ['public' => [
+                'users' => [
+                    TableConfig::KEY_WHERE => 'is_active = true',
+                ],
+            ]]
+        );
+        $result = $this->resolver->resolve($config, $dumpConfig);
+        $this->assertNotNull($result);
+
+        // Полная проверка формата: (fk IN (...) OR fk IS NULL)
+        $this->assertEquals(
+            '(user_id IN (SELECT "id" FROM "public"."users" WHERE is_active = true) OR user_id IS NULL)',
+            $result
+        );
     }
 }

@@ -181,9 +181,22 @@ class DatabaseImporter
         $backslashEscapes = $platformName === PlatformFactory::MYSQL
             || $platformName === PlatformFactory::MARIADB;
 
-        foreach ($filteredFiles as $file) {
-            $current++;
-            $this->importDumpFile($file, $current, $total, $connection, $backslashEscapes);
+        $isMysql = $platformName === PlatformFactory::MYSQL
+            || $platformName === PlatformFactory::MARIADB;
+
+        if ($isMysql) {
+            $connection->executeStatement('SET FOREIGN_KEY_CHECKS=0');
+        }
+
+        try {
+            foreach ($filteredFiles as $file) {
+                $current++;
+                $this->importDumpFile($file, $current, $total, $connection, $backslashEscapes);
+            }
+        } finally {
+            if ($isMysql) {
+                $connection->executeStatement('SET FOREIGN_KEY_CHECKS=1');
+            }
         }
     }
 

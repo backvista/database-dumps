@@ -24,7 +24,7 @@ class MySqlPlatform implements DatabasePlatformInterface
     {
         $fullTable = $this->getFullTableName($schema, $table);
 
-        return "SET FOREIGN_KEY_CHECKS=0;\nTRUNCATE TABLE {$fullTable};\nSET FOREIGN_KEY_CHECKS=1;";
+        return "DELETE FROM {$fullTable};";
     }
 
     public function getSequenceResetSql(string $schema, string $table, DatabaseConnectionInterface $connection): string

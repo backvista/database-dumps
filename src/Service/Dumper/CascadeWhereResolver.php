@@ -142,6 +142,6 @@ class CascadeWhereResolver
             }
         }
 
-        return "{$fkColumn} IN ({$innerSql})";
+        return "({$fkColumn} IN ({$innerSql}) OR {$fkColumn} IS NULL)";
     }
 }
